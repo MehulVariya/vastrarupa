@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+:root {
+  --background: 36 33% 98%;
+  --foreground: 0 0% 10%;
+  
+  --card: 36 33% 99%;
+  --card-foreground: 0 0% 10%;
+  
+  --popover: 36 33% 99%;
+  --popover-foreground: 0 0% 10%;
+  
+  --primary: 36 38% 30%;
+  --primary-foreground: 36 33% 98%;
+  
+  --secondary: 36 20% 92%;
+  --secondary-foreground: 0 0% 10%;
+  
+  --muted: 36 10% 90%;
+  --muted-foreground: 36 8% 45%;
+  
+  --accent: 155 28% 23%;
+  --accent-foreground: 36 33% 98%;
+  
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  
+  --border: 36 15% 88%;
+  --input: 36 15% 88%;
+  --ring: 36 38% 30%;
+  
+  --radius: 0.25rem;
+}
+
+.dark {
+  --background: 0 0% 8%;
+  --foreground: 36 30% 90%;
+  
+  --card: 0 0% 11%;
+  --card-foreground: 36 30% 90%;
+  
+  --popover: 0 0% 11%;
+  --popover-foreground: 36 30% 90%;
+  
+  --primary: 36 38% 70%;
+  --primary-foreground: 0 0% 8%;
+  
+  --secondary: 0 0% 15%;
+  --secondary-foreground: 36 30% 90%;
+  
+  --muted: 0 0% 15%;
+  --muted-foreground: 36 10% 60%;
+  
+  --accent: 155 23% 39%;
+  --accent-foreground: 0 0% 98%;
+  
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  
+  --border: 0 0% 16%;
+  --input: 0 0% 16%;
+  --ring: 36 38% 70%;
+}
+
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  
+  --font-serif: var(--font-playfair), Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-serif);
+    letter-spacing: -0.02em;
+  }
+}
+
+/* Premium Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.5);
+}
+
+/* Image Zoom Hover effect */
+.zoom-container {
+  overflow: hidden;
+  position: relative;
+}
+.zoom-image {
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.zoom-container:hover .zoom-image {
+  transform: scale(1.05);
+}
+
+/* Elegant gold/champagne shimmer loading skeleton */
+@keyframes luxuryShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.luxury-skeleton {
+  background: linear-gradient(90deg, 
+    hsl(var(--muted)) 25%, 
+    hsl(var(--secondary)) 37%, 
+    hsl(var(--muted)) 63%
+  );
+  background-size: 200% 100%;
+  animation: luxuryShimmer 1.5s infinite;
+}

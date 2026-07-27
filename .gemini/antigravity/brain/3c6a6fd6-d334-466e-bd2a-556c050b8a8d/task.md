@@ -1,0 +1,29 @@
+# Task List: Vastrarupa E-Commerce Implementation
+
+- [x] Task 1: Bootstrap Next.js 15 App in Workspace
+- [x] Task 2: Configure Premium Tailwind Design System & CSS
+- [x] Task 3: Write Supabase Database Schema Migration
+- [x] Task 4: Write Database Seed Data for Premium Catalog
+- [x] Task 5: Install Project Dependencies (Framer Motion, Swiper, Query, React Hook Form, Zod, etc.)
+- [x] Task 6: Implement Supabase Client & Server Helpers
+- [x] Task 7: Build Common UI Layouts (Navbar, Footer, Providers, Theme Toggle)
+- [x] Task 8: Implement Customer Shopping Pages
+  - [x] Homepage with premium hero banners & collection showcases
+  - [x] Shop page with category/price/size filters & search suggestions
+  - [x] Product details page with variant selectors, galleries, size guides & reviews
+  - [x] Cart drawer system (client-side state & database sync)
+  - [x] Checkout flow & order confirmation (simulated Razorpay/Stripe checkout)
+- [x] Task 9: Implement Customer Account Portal
+  - [x] Profile management & saved addresses
+  - [x] Order history & tracking status
+  - [x] Wishlist manager
+- [x] Task 10: Implement Admin Management Panel
+  - [x] Dashboard analytics & charts (mock/live)
+  - [x] Product CRUD forms with Zod validation
+  - [x] Order list & status processing (tracking number assignments)
+  - [x] Review moderator & coupon manager
+- [x] Task 11: Implement SEO, PWA & Optimization
+  - [x] Add sitemap, robots, manifest, and icons
+  - [x] Define Structured Data / Schema JSON-LD on key pages
+- [x] Task 12: Verify Compilation & Build Status
+- [x] Task 13: Create Walkthrough Artifact

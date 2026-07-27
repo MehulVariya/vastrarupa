@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirm Your Email - Vastrarupa</title>
+  <style>
+    body {
+      font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+      background-color: #FCFAF7;
+      color: #111111;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrapper {
+      width: 100%;
+      background-color: #FCFAF7;
+      padding: 40px 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border: 1px solid #EAE5DF;
+      padding: 40px;
+      text-align: center;
+    }
+    .logo-container {
+      padding-bottom: 30px;
+      border-bottom: 1px solid #EAE5DF;
+    }
+    .logo {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 26px;
+      font-weight: bold;
+      letter-spacing: 0.25em;
+      color: #36261A;
+      text-decoration: none;
+    }
+    .content {
+      padding: 40px 0;
+      text-align: center;
+    }
+    .title {
+      font-size: 22px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      color: #36261A;
+      margin-bottom: 20px;
+    }
+    .text {
+      font-family: 'Inter', Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #555555;
+      margin-bottom: 35px;
+      max-width: 460px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .button-container {
+      margin-bottom: 40px;
+    }
+    .btn {
+      font-family: 'Inter', Helvetica, Arial, sans-serif;
+      background-color: #36261A;
+      color: #FCFAF7 !important;
+      text-decoration: none;
+      padding: 14px 35px;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      display: inline-block;
+      border-radius: 2px;
+      transition: opacity 0.2s ease;
+    }
+    .footer {
+      border-t: 1px solid #EAE5DF;
+      padding-top: 30px;
+      font-family: 'Inter', Helvetica, Arial, sans-serif;
+      font-size: 10px;
+      color: #888888;
+      line-height: 1.5;
+      text-align: center;
+    }
+    .divider {
+      width: 40px;
+      height: 1px;
+      background-color: #C5A880;
+      margin: 20px auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      {/* Brand Header */}
+      <div class="logo-container">
+        <a href="https://vastrarupa.vercel.app" class="logo">VASTRARUPA</a>
+      </div>
+      
+      {/* Email Body */}
+      <div class="content">
+        <h2 class="title">Confirm Your Email Address</h2>
+        <div class="divider"></div>
+        <p class="text">
+          Thank you for creating an account with Vastrarupa. To finalize your registration and access our exclusive collection of luxury ethnic fashion, please verify your email address below.
+        </p>
+        
+        <div class="button-container">
+          <a href="{{ .ConfirmationURL }}" class="btn">Confirm Email Address</a>
+        </div>
+        
+        <p class="text" style="font-size: 12px; margin-bottom: 0;">
+          If the button above does not work, copy and paste the link below into your web browser:<br>
+          <a href="{{ .ConfirmationURL }}" style="color: #C5A880; word-break: break-all;">{{ .ConfirmationURL }}</a>
+        </p>
+      </div>
+      
+      {/* Brand Footer */}
+      <div class="footer" style="border-top: 1px solid #EAE5DF; padding-top: 30px;">
+        <p>© 2026 VASTRARUPA Private Limited. All Rights Reserved.</p>
+        <p>45, Regal Heritage Plaza, Chanderi Lane, New Delhi, 110001, India</p>
+        <p style="font-size: 9px; margin-top: 15px;">You received this email because you signed up for Vastrarupa.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
