@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/features/auth/useAuth";
 import { useCart } from "@/features/cart/useCart";
 import { useWishlist } from "@/features/wishlist/useWishlist";
@@ -22,10 +22,61 @@ export default function Header() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [announcements, setAnnouncements] = useState<string[]>([
+    "Free Shipping on all orders above ₹2,999"
+  ]);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  // Load announcement setting from Supabase
+  useEffect(() => {
+    const fetchAnnouncement = async () => {
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        const { data } = await supabase
+          .from("settings")
+          .select("value")
+          .eq("key", "announcement_bar")
+          .maybeSingle();
+        if (data?.value && typeof data.value === "object") {
+          if ("announcements" in data.value && Array.isArray((data.value as any).announcements)) {
+            setAnnouncements((data.value as any).announcements);
+          } else if ("text" in data.value) {
+            setAnnouncements([(data.value as any).text]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load announcement bar settings:", err);
+      }
+    };
+    fetchAnnouncement();
+  }, []);
+
+  // Cycle announcements carousel
+  useEffect(() => {
+    if (announcements.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentIdx((prev) => (prev + 1) % announcements.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, [announcements]);
 
   // Close menus on path changes
   useEffect(() => {
@@ -51,16 +102,33 @@ export default function Header() {
     { label: "Dupattas", href: "/shop?category=dupattas" },
   ];
 
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
+
   return (
     <>
       <header className="sticky top-0 z-40 w-full bg-background/80 backdrop-blur-md border-b border-border">
         {/* Top promo bar */}
-        <div className="w-full bg-primary text-primary-foreground py-1.5 text-center text-[11px] font-semibold tracking-wider uppercase">
-          Free Shipping on all orders above ₹2,999
+        <div className="w-full bg-primary text-primary-foreground h-9 relative overflow-hidden flex items-center justify-center text-[10px] font-semibold tracking-widest uppercase">
+          {announcements.length > 0 && (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentIdx}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.35, ease: "easeInOut" }}
+                className="absolute text-center px-4 w-full"
+              >
+                {announcements[currentIdx]}
+              </motion.div>
+            </AnimatePresence>
+          )}
         </div>
 
         {/* Main Navbar */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+        <div className="w-full px-4 sm:px-6 h-20 flex items-center justify-between">
           {/* Mobile menu trigger */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -139,7 +207,7 @@ export default function Header() {
             </button>
 
             {/* Account / User Menu */}
-            <div className="relative">
+            <div ref={profileMenuRef} className="relative">
               {user ? (
                 <>
                   <button
@@ -153,10 +221,6 @@ export default function Header() {
                   <AnimatePresence>
                     {isProfileMenuOpen && (
                       <>
-                        <div
-                          className="fixed inset-0 z-30"
-                          onClick={() => setIsProfileMenuOpen(false)}
-                        />
                         <motion.div
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}

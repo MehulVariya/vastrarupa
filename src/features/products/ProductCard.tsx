@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCart } from "@/features/cart/useCart";
 import { useWishlist } from "@/features/wishlist/useWishlist";
 import { formatPrice } from "@/lib/utils";
@@ -41,8 +41,13 @@ export default function ProductCard({ product }: ProductCardProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [showSizes, setShowSizes] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  const favorited = isInWishlist(product.id);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const favorited = mounted ? isInWishlist(product.id) : false;
   const mainImage = product.images?.[0]?.url || "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=800&auto=format&fit=crop";
   const hoverImage = product.images?.[1]?.url || mainImage;
 

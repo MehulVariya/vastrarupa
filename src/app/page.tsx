@@ -23,7 +23,7 @@ const MOCK_PRODUCTS: Product[] = [
     ],
     images: [
       { url: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=800&auto=format&fit=crop", alt_text: "Ivory Chikankari Kurti" },
-      { url: "https://images.unsplash.com/photo-1610030470298-4c6e6d15b026?q=80&w=800&auto=format&fit=crop", alt_text: "Ivory Chikankari Kurti Detail" },
+      { url: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=800&auto=format&fit=crop", alt_text: "Ivory Chikankari Kurti Detail" },
     ],
   },
   {
@@ -94,39 +94,61 @@ export default async function HomePage() {
   try {
     const supabase = await createClient();
     
-    // Fetch products
+    // Fetch products using new colors and sizes schema
     const { data: dbProducts } = await supabase
       .from("products")
       .select(`
-        id, name, slug, price, sale_price, material, is_trending, is_featured,
-        category:categories(name, slug),
-        variants:product_variants(id, size, color, inventory(quantity)),
-        images:product_images(url, alt_text)
+        id, name, slug, mrp, selling_price, fabric, is_trending, is_featured, category,
+        colors:product_colors (
+          id, 
+          color_name, 
+          hex_code, 
+          thumbnail,
+          sizes:product_sizes (
+            id, 
+            size, 
+            stock
+          ),
+          images:product_images (
+            image
+          )
+        )
       `)
       .eq("status", "published")
       .limit(8);
 
     if (dbProducts && dbProducts.length > 0) {
-      products = dbProducts.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        slug: p.slug,
-        price: Number(p.price),
-        sale_price: p.sale_price ? Number(p.sale_price) : null,
-        material: p.material,
-        is_trending: p.is_trending,
-        is_featured: p.is_featured,
-        category: p.category ? { name: p.category.name, slug: p.category.slug } : null,
-        variants: (p.variants || []).map((v: any) => ({
-          id: v.id,
-          size: v.size,
-          color: v.color,
-          quantity: v.inventory?.[0]?.quantity || 0,
-        })),
-        images: p.images || [],
-      }));
+      products = dbProducts.map((p: any) => {
+        const firstColor = p.colors?.[0] || { color_name: "Default", thumbnail: "", sizes: [], images: [] };
+        return {
+          id: p.id,
+          name: p.name,
+          slug: p.slug,
+          price: Number(p.mrp),
+          sale_price: p.selling_price ? Number(p.selling_price) : null,
+          material: p.fabric,
+          is_trending: p.is_trending,
+          is_featured: p.is_featured,
+          category: p.category ? {
+            name: p.category,
+            slug: p.category.toLowerCase().replace(/\s+/g, "-"),
+          } : null,
+          variants: (firstColor.sizes || []).map((s: any) => ({
+            id: s.id,
+            size: s.size,
+            color: firstColor.color_name,
+            quantity: s.stock || 0,
+          })),
+          images: (firstColor.images || []).map((img: any) => ({
+            url: img.image,
+            alt_text: "",
+          })).concat(
+            firstColor.thumbnail ? [{ url: firstColor.thumbnail, alt_text: "" }] : []
+          ),
+        };
+      });
     } else {
-      products = MOCK_PRODUCTS;
+      products = [];
     }
 
     // Fetch banners
@@ -139,7 +161,7 @@ export default async function HomePage() {
     banners = dbBanners || [];
   } catch (error) {
     console.error("Error fetching homepage data:", error);
-    products = MOCK_PRODUCTS;
+    products = [];
   }
 
   // Active hero banner
@@ -155,7 +177,7 @@ export default async function HomePage() {
     { name: "Kurta Sets", href: "/shop?category=kurta-sets", img: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=400&auto=format&fit=crop" },
     { name: "Gowns", href: "/shop?category=gowns", img: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?q=80&w=400&auto=format&fit=crop" },
     { name: "Co-ord Sets", href: "/shop?category=co-ord-sets", img: "https://images.unsplash.com/photo-1596783074918-c84cb06531ca?q=80&w=400&auto=format&fit=crop" },
-    { name: "Dupattas", href: "/shop?category=dupattas", img: "https://images.unsplash.com/photo-1610030470298-4c6e6d15b026?q=80&w=400&auto=format&fit=crop" },
+    { name: "Dupattas", href: "/shop?category=dupattas", img: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=400&auto=format&fit=crop" },
   ];
 
   return (
@@ -167,10 +189,11 @@ export default async function HomePage() {
           alt={activeHero.title}
           fill
           priority
+          sizes="100vw"
           className="object-cover brightness-[0.8] dark:brightness-[0.7]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-        <div className="absolute inset-0 flex flex-col justify-end pb-12 sm:pb-20 px-4 sm:px-8 max-w-7xl mx-auto text-white">
+        <div className="absolute inset-0 flex flex-col justify-end pb-12 sm:pb-20 px-4 sm:px-8 text-white">
           <div className="max-w-2xl space-y-4">
             <span className="text-xs font-bold tracking-[0.3em] uppercase text-primary">New Collection</span>
             <h1 className="font-serif text-4xl sm:text-6xl font-medium leading-tight">
@@ -193,7 +216,7 @@ export default async function HomePage() {
       </section>
 
       {/* 2. CATEGORIES SHOPPING CIRCLES */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8">
+      <section className="w-full px-4 sm:px-6 text-center space-y-8">
         <div className="space-y-2">
           <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-muted-foreground">Artisanal Weaves</span>
           <h2 className="font-serif text-2xl sm:text-3xl font-semibold tracking-wide">Shop by Category</h2>
@@ -220,12 +243,13 @@ export default async function HomePage() {
 
       {/* 3. EDITORIAL SHOWCASE (The Atelier Story) */}
       <section className="bg-card border-y border-border py-16 md:py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div className="w-full px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="relative aspect-[4/5] bg-secondary border border-border">
             <Image
               src="https://images.unsplash.com/photo-1596783074918-c84cb06531ca?q=80&w=800&auto=format&fit=crop"
               alt="Atelier Craftsman Embroidery"
               fill
+              sizes="(max-width: 1024px) 100vw, 50vw"
               className="object-cover"
             />
           </div>
@@ -254,7 +278,7 @@ export default async function HomePage() {
       </section>
 
       {/* 4. TRENDING PRODUCTS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+      <section className="w-full px-4 sm:px-6 space-y-10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
           <div className="space-y-2">
             <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-muted-foreground">The Season Edit</span>
@@ -268,11 +292,29 @@ export default async function HomePage() {
             <ArrowRight size={12} />
           </Link>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-10 sm:gap-x-6">
-          {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        {products.length === 0 ? (
+          <div className="py-16 border border-dashed border-border/85 flex flex-col items-center justify-center text-center space-y-4 bg-card max-w-2xl mx-auto rounded-sm px-6">
+            <Sparkles size={28} className="text-primary/75 animate-pulse" />
+            <div className="space-y-1">
+              <h3 className="font-serif text-base font-semibold tracking-wide text-foreground">The Atelier is Preparing New Silhouettes</h3>
+              <p className="text-muted-foreground text-xs max-w-md leading-relaxed">
+                Our new collections of handcrafted ethnic ensembles are currently being prepared. Check back shortly for our new seasonal catalog.
+              </p>
+            </div>
+            <Link
+              href="/shop"
+              className="px-5 py-2.5 bg-primary text-primary-foreground font-semibold text-[10px] tracking-widest uppercase hover:opacity-90 transition rounded-sm"
+            >
+              Browse Shop
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-10 sm:gap-x-6">
+            {products.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 5. TESTIMONIALS */}
@@ -307,7 +349,7 @@ export default async function HomePage() {
               </div>
               <p className="text-muted-foreground text-xs italic leading-relaxed">"{item.quote}"</p>
               <span className="text-[10px] font-bold tracking-widest uppercase text-foreground">
-                — {item.author}
+                â€” {item.author}
               </span>
             </div>
           ))}
@@ -315,7 +357,7 @@ export default async function HomePage() {
       </section>
 
       {/* 6. TRUST PILLARS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 sm:grid-cols-3 gap-8 text-center pt-8">
+      <section className="w-full px-4 sm:px-6 grid grid-cols-1 sm:grid-cols-3 gap-8 text-center pt-8">
         <div className="space-y-2.5 flex flex-col items-center">
           <div className="p-3 bg-card border border-border rounded-full text-primary">
             <Sparkles size={22} />
@@ -347,3 +389,4 @@ export default async function HomePage() {
     </div>
   );
 }
+

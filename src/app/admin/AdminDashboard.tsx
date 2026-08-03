@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
 import { formatPrice, formatDate } from "@/lib/utils";
 import {
@@ -18,18 +19,23 @@ import {
   RefreshCw,
   Sliders,
   LogOut,
+  Settings,
+  Lock,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
 
   // Metrics
   const [metrics, setMetrics] = useState({
-    revenue: 124500,
-    orders: 45,
-    avgValue: 2766,
-    activeCoupons: 3,
+    revenue: 0,
+    orders: 0,
+    avgValue: 0,
+    activeCoupons: 0,
   });
 
   // DB Lists
@@ -46,6 +52,17 @@ export default function AdminDashboard() {
   // Product Form State
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
+
+  // Change Password State
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPass, setShowCurrentPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
+  const [isChangingPass, setIsChangingPass] = useState(false);
+  const [passMsg, setPassMsg] = useState("");
+  const [passMsgType, setPassMsgType] = useState<"success" | "error">("success");
   const [prodName, setProdName] = useState("");
   const [prodDescription, setProdDescription] = useState("");
   const [prodPrice, setProdPrice] = useState("");
@@ -56,10 +73,98 @@ export default function AdminDashboard() {
   const [prodStatus, setProdStatus] = useState("published");
   const [prodIsFeatured, setProdIsFeatured] = useState(false);
   const [prodIsTrending, setProdIsTrending] = useState(false);
-  // Simple variant addition for simplicity
-  const [prodSize, setProdSize] = useState("M");
-  const [prodColor, setProdColor] = useState("Ivory");
-  const [prodQuantity, setProdQuantity] = useState("10");
+  // Advanced dynamic color variants & sizes matrix
+  const [prodColors, setProdColors] = useState<Array<{
+    id?: string;
+    name: string;
+    hex: string;
+    sku: string;
+    thumbnail: string;
+    gallery: string[];
+    sizes: Record<string, number>;
+  }>>([]);
+
+  // File Upload State and Helpers
+  const [uploadingIndex, setUploadingIndex] = useState<string | null>(null);
+
+  const uploadImageFile = async (file: File): Promise<string> => {
+    const supabase = createClient();
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${Math.random().toString(36).substring(2, 15)}-${Date.now()}.${fileExt}`;
+    const filePath = `catalog/${fileName}`;
+
+    try {
+      // 1. Ensure public products storage bucket exists
+      try {
+        await supabase.storage.createBucket("products", { public: true });
+      } catch (e) {
+        // Handled silently
+      }
+
+      // 2. Upload file
+      const { data, error } = await supabase.storage
+        .from("products")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (error) throw error;
+
+      // 3. Return public path
+      const { data: urlData } = supabase.storage
+        .from("products")
+        .getPublicUrl(filePath);
+
+      return urlData.publicUrl;
+    } catch (err) {
+      console.warn("Storage upload failed, using FileReader Base64 fallback:", err);
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("File reading failed"));
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  const handleThumbnailFileChange = async (colorIdx: number, file: File) => {
+    setUploadingIndex(`thumb-${colorIdx}`);
+    try {
+      const url = await uploadImageFile(file);
+      const nextColors = [...prodColors];
+      nextColors[colorIdx].thumbnail = url;
+      setProdColors(nextColors);
+    } catch (err) {
+      console.error("Thumbnail upload failed:", err);
+    } finally {
+      setUploadingIndex(null);
+    }
+  };
+
+  const handleGalleryFilesChange = async (colorIdx: number, files: FileList) => {
+    setUploadingIndex(`gallery-${colorIdx}`);
+    try {
+      const urls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const url = await uploadImageFile(files[i]);
+        urls.push(url);
+      }
+      const nextColors = [...prodColors];
+      nextColors[colorIdx].gallery = [...nextColors[colorIdx].gallery, ...urls];
+      setProdColors(nextColors);
+    } catch (err) {
+      console.error("Gallery upload failed:", err);
+    } finally {
+      setUploadingIndex(null);
+    }
+  };
+
+  const removeGalleryImage = (colorIdx: number, imgIdx: number) => {
+    const nextColors = [...prodColors];
+    nextColors[colorIdx].gallery = nextColors[colorIdx].gallery.filter((_, idx) => idx !== imgIdx);
+    setProdColors(nextColors);
+  };
 
   // Order Detail / Edit Status State
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
@@ -74,6 +179,155 @@ export default function AdminDashboard() {
   const [couponMinVal, setCouponMinVal] = useState("1999");
   const [couponLimit, setCouponLimit] = useState("100");
 
+  // Category Form State
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatDescription, setNewCatDescription] = useState("");
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCatName.trim()) return;
+    setIsSavingCategory(true);
+    const supabase = createClient();
+    try {
+      const slug = newCatName.toLowerCase().replace(/ /g, "-").replace(/[^\w-]+/g, "");
+      const { error } = await supabase
+        .from("categories")
+        .insert({
+          name: newCatName.trim(),
+          slug,
+          description: newCatDescription.trim() || null,
+        });
+
+      if (error) throw error;
+      setNewCatName("");
+      setNewCatDescription("");
+      alert("Category created successfully!");
+      loadAdminData();
+    } catch (err: any) {
+      console.error(err);
+      alert("Error creating category: " + (err.message || err));
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async (catId: string) => {
+    if (!confirm("Are you sure you want to delete this category? Products in this category will become uncategorized.")) return;
+    const supabase = createClient();
+    try {
+      const { error } = await supabase.from("categories").delete().eq("id", catId);
+      if (error) throw error;
+      loadAdminData();
+    } catch (err: any) {
+      console.error(err);
+      alert("Error deleting category: " + (err.message || err));
+    }
+  };
+
+  // Settings Tab states
+  const [announcements, setAnnouncements] = useState<string[]>([
+    "Free Shipping on all orders above ₹2,999"
+  ]);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [settingsMsg, setSettingsMsg] = useState("");
+
+  const handleAddAnnouncement = () => {
+    setAnnouncements([...announcements, ""]);
+  };
+
+  const handleRemoveAnnouncement = (index: number) => {
+    const updated = [...announcements];
+    updated.splice(index, 1);
+    setAnnouncements(updated);
+  };
+
+  const handleAnnouncementChange = (index: number, val: string) => {
+    const updated = [...announcements];
+    updated[index] = val;
+    setAnnouncements(updated);
+  };
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    setSettingsMsg("");
+    try {
+      const supabase = createClient();
+      const filtered = announcements.filter(t => t.trim() !== "");
+      if (filtered.length === 0) {
+        filtered.push("Free Shipping on all orders above ₹2,999");
+      }
+      const { error } = await supabase
+        .from("settings")
+        .upsert({
+          key: "announcement_bar",
+          value: { announcements: filtered }
+        });
+      if (error) throw error;
+      setAnnouncements(filtered);
+      setSettingsMsg("Settings saved successfully!");
+    } catch (err: any) {
+      console.error("Failed to save settings:", err);
+      setSettingsMsg("Error: " + (err.message || "Failed to save settings."));
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPassMsg("");
+
+    if (newPassword.length < 8) {
+      setPassMsg("New password must be at least 8 characters.");
+      setPassMsgType("error");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPassMsg("New passwords do not match.");
+      setPassMsgType("error");
+      return;
+    }
+
+    setIsChangingPass(true);
+    try {
+      const supabase = createClient();
+
+      // Re-authenticate with current password first
+      const { data: userData } = await supabase.auth.getUser();
+      const email = userData.user?.email;
+      if (!email) throw new Error("Not authenticated.");
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+      if (signInError) {
+        setPassMsg("Current password is incorrect.");
+        setPassMsgType("error");
+        return;
+      }
+
+      // Update to new password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (updateError) throw updateError;
+
+      setPassMsg("Password changed successfully!");
+      setPassMsgType("success");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      setPassMsg(err.message || "Failed to change password.");
+      setPassMsgType("error");
+    } finally {
+      setIsChangingPass(false);
+    }
+  };
+
   const loadAdminData = async () => {
     setLoading(true);
     try {
@@ -87,21 +341,78 @@ export default function AdminDashboard() {
       }
 
       // Products
+      // Products query updated to new colors and sizes schema
       const { data: prods } = await supabase
         .from("products")
         .select(`
           *,
-          category:categories(name),
-          variants:product_variants(id, size, color, inventory(quantity)),
-          images:product_images(url)
+          category:categories (id, name),
+          colors:product_colors (
+            id, 
+            color_name, 
+            hex_code, 
+            sku, 
+            thumbnail, 
+            display_order, 
+            status,
+            sizes:product_sizes (
+              id, 
+              size, 
+              stock, 
+              price_override, 
+              mrp_override, 
+              sku
+            ),
+            images:product_images (
+              id, 
+              image, 
+              display_order
+            )
+          )
         `)
         .order("created_at", { ascending: false });
-      setProducts(prods || []);
+
+      if (prods) {
+        const mappedProds = prods.map((p: any) => {
+          const firstColor = p.colors?.[0] || { color_name: "Default", thumbnail: "", sizes: [], images: [] };
+          return {
+            ...p,
+            price: Number(p.mrp || 0),
+            sale_price: p.selling_price ? Number(p.selling_price) : null,
+            material: p.fabric || null,
+            care_instructions: p.fit || null,
+            images: (firstColor.images || []).map((img: any) => ({ url: img.image || img, alt_text: "" })).concat(
+              firstColor.thumbnail ? [{ url: firstColor.thumbnail, alt_text: "" }] : []
+            ),
+            variants: (firstColor.sizes || []).map((s: any) => ({
+              id: s.id,
+              size: s.size,
+              color: firstColor.color_name,
+              inventory: [{ quantity: s.stock }]
+            }))
+          };
+        });
+        setProducts(mappedProds);
+      } else {
+        setProducts([]);
+      }
 
       // Orders
       const { data: ords } = await supabase
         .from("orders")
-        .select("*")
+        .select(`
+          *,
+          order_items (
+            id, quantity, price,
+            product:products (
+              id, name, slug,
+              colors:product_colors (
+                thumbnail,
+                images:product_images ( image )
+              )
+            )
+          )
+        `)
         .order("created_at", { ascending: false });
       setOrders(ords || []);
 
@@ -109,15 +420,70 @@ export default function AdminDashboard() {
       const { data: coups } = await supabase.from("coupons").select("*");
       setCoupons(coups || []);
 
-      // Low Stock inventory check
+      // Calculate dynamic real-time metrics
+      const activeOrders = (ords || []).filter(o => o.status !== "cancelled");
+      const realOrdersCount = ords ? ords.length : 0;
+      const realRevenue = activeOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+      const realAvgValue = realOrdersCount > 0 ? Math.round(realRevenue / realOrdersCount) : 0;
+      const activeCoupsCount = (coups || []).filter(c => {
+        if (!c.active_to) return true;
+        return new Date(c.active_to) > new Date();
+      }).length;
+
+      setMetrics({
+        revenue: realRevenue,
+        orders: realOrdersCount,
+        avgValue: realAvgValue,
+        activeCoupons: activeCoupsCount,
+      });
+
+      // Settings
+      const { data: annSetting } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "announcement_bar")
+        .maybeSingle();
+      if (annSetting?.value && typeof annSetting.value === "object") {
+        if ("announcements" in annSetting.value && Array.isArray((annSetting.value as any).announcements)) {
+          setAnnouncements((annSetting.value as any).announcements);
+        } else if ("text" in annSetting.value) {
+          setAnnouncements([(annSetting.value as any).text]);
+        }
+      } else {
+        setAnnouncements(["Free Shipping on all orders above ₹2,999"]);
+      }
+
+      // Low Stock inventory check mapping to new tables
       const { data: stockAlerts } = await supabase
-        .from("inventory")
+        .from("product_sizes")
         .select(`
-          quantity,
-          variant:product_variants(size, color, product:products(name))
+          stock,
+          size,
+          product_color:product_color_id (
+            color_name,
+            product:product_id (
+              name
+            )
+          )
         `)
-        .lt("quantity", 5);
-      setLowStock(stockAlerts || []);
+        .lt("stock", 5);
+
+      if (stockAlerts) {
+        setLowStock(
+          stockAlerts.map((s: any) => ({
+            quantity: s.stock,
+            variant: {
+              size: s.size,
+              color: s.product_color?.color_name,
+              product: {
+                name: s.product_color?.product?.name
+              }
+            }
+          }))
+        );
+      } else {
+        setLowStock([]);
+      }
 
       // Calculate Metrics from real DB
       if (ords && ords.length > 0) {
@@ -144,111 +510,217 @@ export default function AdminDashboard() {
   const handleCreateOrUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     const supabase = createClient();
+
     try {
+      // 1. Zod Validation Checks
+      const colorSchema = z.object({
+        name: z.string().min(1, "Color name is required"),
+        hex: z.string().min(3, "Hex code must be valid (e.g. #000000)"),
+        sku: z.string().min(1, "Color SKU is required"),
+        thumbnail: z.string().url("Thumbnail must be a valid URL"),
+        gallery: z.array(z.string().url("Gallery images must be valid URLs")).min(1, "Each color variant must have at least one gallery image"),
+        sizes: z.record(z.string(), z.number().min(0, "Stock cannot be negative"))
+      });
+
+      const productFormSchema = z.object({
+        name: z.string().min(3, "Product name must be at least 3 characters"),
+        description: z.string().min(5, "Description must be at least 5 characters"),
+        mrp: z.number().min(0, "MRP must be positive"),
+        selling_price: z.number().min(0, "Selling price must be positive"),
+        colors: z.array(colorSchema).min(1, "Product must have at least one color variant"),
+        status: z.string()
+      }).refine(data => data.selling_price <= data.mrp, {
+        message: "Selling price cannot exceed MRP",
+        path: ["selling_price"]
+      });
+
+      const parsedMRP = parseFloat(prodPrice) || 0;
+      const parsedSellingPrice = parseFloat(prodSalePrice) || parsedMRP;
+
+      const validationResult = productFormSchema.safeParse({
+        name: prodName,
+        description: prodDescription,
+        mrp: parsedMRP,
+        selling_price: parsedSellingPrice,
+        colors: prodColors,
+        status: prodStatus
+      });
+
+      if (!validationResult.success) {
+        const errors = validationResult.error.issues.map(issue => issue.message).join("\n");
+        alert("Validation Error:\n" + errors);
+        return;
+      }
+
+      // Check if product is published but has zero total stock
+      const totalStock = prodColors.reduce((acc, col) => {
+        return acc + Object.values(col.sizes).reduce((sAcc, stk) => sAcc + Number(stk), 0);
+      }, 0);
+
+      if (prodStatus === "published" && totalStock <= 0) {
+        alert("Validation Error: Cannot publish product with 0 total stock inventory.");
+        return;
+      }
+
+      let activeProdId = editingProduct?.id;
+
+      // 2. Perform DB Insertion/Update
       if (editingProduct) {
         // Update product
-        const { error } = await supabase
+        const payload: any = {
+          name: prodName,
+          description: prodDescription,
+          mrp: parsedMRP,
+          selling_price: parsedSellingPrice,
+          category_id: prodCategoryId || null,
+          category: categories.find(c => c.id === prodCategoryId)?.name || null,
+          fabric: prodMaterial || null,
+          fit: prodCare || null,
+          status: prodStatus,
+          is_featured: prodIsFeatured,
+          is_trending: prodIsTrending,
+        };
+
+        let { error: updateErr } = await supabase
           .from("products")
-          .update({
-            name: prodName,
-            description: prodDescription,
-            price: parseFloat(prodPrice),
-            sale_price: prodSalePrice ? parseFloat(prodSalePrice) : null,
-            category_id: prodCategoryId || null,
-            material: prodMaterial || null,
-            care_instructions: prodCare || null,
-            status: prodStatus,
-            is_featured: prodIsFeatured,
-            is_trending: prodIsTrending,
-          })
+          .update(payload)
           .eq("id", editingProduct.id);
 
-        if (error) throw error;
+        if (updateErr && updateErr.message.includes("category")) {
+          console.warn("Retrying update without 'category' column due to schema cache mismatch.");
+          delete payload.category;
+          const { error: retryErr } = await supabase
+            .from("products")
+            .update(payload)
+            .eq("id", editingProduct.id);
+          updateErr = retryErr;
+        }
+
+        if (updateErr) throw updateErr;
+
+        // Clean slate update for colors, sizes and images
+        await supabase.from("product_colors").delete().eq("product_id", editingProduct.id);
+
+        for (const col of prodColors) {
+          const { data: newCol, error: colErr } = await supabase
+            .from("product_colors")
+            .insert({
+              product_id: editingProduct.id,
+              color_name: col.name,
+              hex_code: col.hex,
+              sku: col.sku,
+              thumbnail: col.thumbnail,
+              status: "active"
+            })
+            .select("id")
+            .single();
+
+          if (colErr || !newCol) throw colErr;
+
+          // Insert sizes
+          const sizeInserts = Object.entries(col.sizes).map(([sz, stock]) => ({
+            product_color_id: newCol.id,
+            size: sz,
+            stock: Number(stock),
+            sku: `${col.sku}-${sz}`,
+          }));
+          await supabase.from("product_sizes").insert(sizeInserts);
+
+          // Insert gallery images
+          if (col.gallery && col.gallery.length > 0) {
+            const imgInserts = col.gallery.map((img, idx) => ({
+              product_color_id: newCol.id,
+              image: img,
+              display_order: idx + 1,
+            }));
+            await supabase.from("product_images").insert(imgInserts);
+          }
+        }
       } else {
         // Create product
-        const prodSlug = prodName.toLowerCase().replace(/ /g, "-").replace(/[^\w-]+/g, "");
-        const { data: newProd, error } = await supabase
+        const baseSlug = prodName.toLowerCase().replace(/ /g, "-").replace(/[^\w-]+/g, "");
+        const suffix = Math.random().toString(36).substring(2, 6);
+        const prodSlug = `${baseSlug}-${suffix}`;
+        const payload: any = {
+          name: prodName,
+          slug: prodSlug,
+          description: prodDescription,
+          mrp: parsedMRP,
+          selling_price: parsedSellingPrice,
+          category_id: prodCategoryId || null,
+          category: categories.find(c => c.id === prodCategoryId)?.name || null,
+          fabric: prodMaterial || null,
+          fit: prodCare || null,
+          status: prodStatus,
+          is_featured: prodIsFeatured,
+          is_trending: prodIsTrending,
+        };
+
+        let { data: newProd, error: createErr } = await supabase
           .from("products")
-          .insert({
-            name: prodName,
-            slug: prodSlug,
-            description: prodDescription,
-            price: parseFloat(prodPrice),
-            sale_price: prodSalePrice ? parseFloat(prodSalePrice) : null,
-            category_id: prodCategoryId || null,
-            material: prodMaterial || null,
-            care_instructions: prodCare || null,
-            status: prodStatus,
-            is_featured: prodIsFeatured,
-            is_trending: prodIsTrending,
-          })
+          .insert(payload)
           .select("id")
           .single();
 
-        if (error || !newProd) throw error;
+        if (createErr && createErr.message.includes("category")) {
+          console.warn("Retrying insert without 'category' column due to schema cache mismatch.");
+          delete payload.category;
+          const { data: retryProd, error: retryErr } = await supabase
+            .from("products")
+            .insert(payload)
+            .select("id")
+            .single();
+          newProd = retryProd;
+          createErr = retryErr;
+        }
 
-        // Insert variant
-        const skuNo = `SKU-${prodName.substring(0, 3).toUpperCase()}-${prodSize}-${Date.now().toString().slice(-4)}`;
-        const { data: newVariant, error: varErr } = await supabase
-          .from("product_variants")
-          .insert({
-            product_id: newProd.id,
-            sku: skuNo,
-            size: prodSize,
-            color: prodColor,
-          })
-          .select("id")
-          .single();
+        if (createErr || !newProd) throw createErr || new Error("Failed to create product");
+        activeProdId = newProd.id;
 
-        if (varErr || !newVariant) throw varErr;
+        for (const col of prodColors) {
+          const { data: newCol, error: colErr } = await supabase
+            .from("product_colors")
+            .insert({
+              product_id: newProd.id,
+              color_name: col.name,
+              hex_code: col.hex,
+              sku: col.sku,
+              thumbnail: col.thumbnail,
+              status: "active"
+            })
+            .select("id")
+            .single();
 
-        // Insert inventory
-        await supabase.from("inventory").insert({
-          variant_id: newVariant.id,
-          quantity: parseInt(prodQuantity),
-        });
+          if (colErr || !newCol) throw colErr;
 
-        // Insert placeholder image url
-        await supabase.from("product_images").insert({
-          product_id: newProd.id,
-          url: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=800&auto=format&fit=crop",
-          is_featured: true,
-          alt_text: prodName,
-        });
+          // Insert sizes
+          const sizeInserts = Object.entries(col.sizes).map(([sz, stock]) => ({
+            product_color_id: newCol.id,
+            size: sz,
+            stock: Number(stock),
+            sku: `${col.sku}-${sz}`,
+          }));
+          await supabase.from("product_sizes").insert(sizeInserts);
+
+          // Insert gallery images
+          if (col.gallery && col.gallery.length > 0) {
+            const imgInserts = col.gallery.map((img, idx) => ({
+              product_color_id: newCol.id,
+              image: img,
+              display_order: idx + 1,
+            }));
+            await supabase.from("product_images").insert(imgInserts);
+          }
+        }
       }
 
       setIsProductModalOpen(false);
       setEditingProduct(null);
       clearProductForm();
       loadAdminData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Database error or missing environment config. Product saved locally in UI mockup.");
-      // Fallback update products list inside local UI state for mockup
-      if (editingProduct) {
-        setProducts(
-          products.map((p) =>
-            p.id === editingProduct.id
-              ? { ...p, name: prodName, price: prodPrice, status: prodStatus }
-              : p
-          )
-        );
-      } else {
-        const mockNew = {
-          id: Date.now().toString(),
-          name: prodName,
-          price: prodPrice,
-          sale_price: prodSalePrice || null,
-          status: prodStatus,
-          category: { name: "Mock category" },
-          variants: [{ size: prodSize, color: prodColor, inventory: [{ quantity: prodQuantity }] }],
-          images: [{ url: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=800&auto=format&fit=crop" }],
-        };
-        setProducts([mockNew, ...products]);
-      }
-      setIsProductModalOpen(false);
-      setEditingProduct(null);
-      clearProductForm();
+      alert("Error saving product: " + (err.message || err));
     }
   };
 
@@ -256,27 +728,108 @@ export default function AdminDashboard() {
     setEditingProduct(p);
     setProdName(p.name);
     setProdDescription(p.description || "");
-    setProdPrice(p.price.toString());
-    setProdSalePrice(p.sale_price ? p.sale_price.toString() : "");
+    setProdPrice((p.mrp || p.price || "").toString());
+    setProdSalePrice((p.selling_price || p.sale_price || "").toString());
     setProdCategoryId(p.category_id || "");
-    setProdMaterial(p.material || "");
-    setProdCare(p.care_instructions || "");
+    setProdMaterial(p.fabric || p.material || "");
+    setProdCare(p.fit || p.care_instructions || "");
     setProdStatus(p.status);
     setProdIsFeatured(p.is_featured);
     setProdIsTrending(p.is_trending);
+    
+    if (p.colors && p.colors.length > 0) {
+      setProdColors(p.colors.map((c: any) => {
+        const sizeStockMap: Record<string, number> = {};
+        (c.sizes || []).forEach((s: any) => {
+          sizeStockMap[s.size] = s.stock;
+        });
+        return {
+          id: c.id,
+          name: c.color_name,
+          hex: c.hex_code,
+          sku: c.sku,
+          thumbnail: c.thumbnail,
+          gallery: (c.images || []).map((img: any) => img.image || img),
+          sizes: sizeStockMap,
+        };
+      }));
+    } else {
+      setProdColors([]);
+    }
     setIsProductModalOpen(true);
   };
 
   const handleDeleteProduct = async (pId: string) => {
-    if (!confirm("Are you sure you want to delete this product?")) return;
+    if (!confirm(
+      "Are you sure you want to permanently delete this product?\n\n" +
+      "⚠ This will also remove any order line items linked to it.\n\n" +
+      "This cannot be undone."
+    )) return;
+
     const supabase = createClient();
     try {
-      await supabase.from("products").delete().eq("id", pId);
+      // 1. Get all color variant IDs for this product
+      const { data: colorRows } = await supabase
+        .from("product_colors")
+        .select("id")
+        .eq("product_id", pId);
+
+      const colorIds = (colorRows || []).map((c: any) => c.id);
+
+      // 2. Delete order_items that reference this product directly
+      //    (FK: order_items.product_id → products.id, NOT NULL constraint)
+      await supabase
+        .from("order_items")
+        .delete()
+        .eq("product_id", pId);
+
+      // 3. Delete order_items that reference any color variant of this product
+      if (colorIds.length > 0) {
+        // Some schemas use product_color_id on order_items
+        const { error: oiErr } = await supabase
+          .from("order_items")
+          .delete()
+          .in("product_color_id", colorIds);
+        // Ignore error here — column may not exist in all schemas
+      }
+
+      // 4. Delete product_images for all colors
+      if (colorIds.length > 0) {
+        await supabase
+          .from("product_images")
+          .delete()
+          .in("product_color_id", colorIds);
+
+        // 5. Delete product_sizes for all colors
+        await supabase
+          .from("product_sizes")
+          .delete()
+          .in("product_color_id", colorIds);
+
+        // 6. Delete product_colors
+        await supabase
+          .from("product_colors")
+          .delete()
+          .eq("product_id", pId);
+      }
+
+      // 7. Finally delete the product itself
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", pId);
+
+      if (error) throw error;
+
+      // Update UI immediately, then refresh full data
+      setProducts((prev: any[]) => prev.filter((p) => p.id !== pId));
       loadAdminData();
-    } catch (err) {
-      setProducts(products.filter((p) => p.id !== pId));
+    } catch (err: any) {
+      console.error("Delete product error:", err);
+      alert("Failed to delete product: " + (err.message || "Unknown error"));
     }
   };
+
 
   const clearProductForm = () => {
     setProdName("");
@@ -288,9 +841,7 @@ export default function AdminDashboard() {
     setProdStatus("published");
     setProdIsFeatured(false);
     setProdIsTrending(false);
-    setProdSize("M");
-    setProdColor("Ivory");
-    setProdQuantity("10");
+    setProdColors([]);
   };
 
   const handleOrderUpdate = async (e: React.FormEvent) => {
@@ -374,8 +925,10 @@ export default function AdminDashboard() {
           {[
             { id: "overview", label: "Dashboard Overview", icon: LayoutDashboard },
             { id: "products", label: "Products Catalog", icon: ShoppingBag },
+            { id: "categories", label: "Categories Catalog", icon: Sliders },
             { id: "orders", label: "Orders Ledger", icon: Truck },
             { id: "coupons", label: "Coupons Manager", icon: Tag },
+            { id: "settings", label: "Store Settings", icon: Settings },
           ].map((tab) => {
             const Icon = tab.icon;
             return (
@@ -536,17 +1089,13 @@ export default function AdminDashboard() {
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="font-serif text-base font-semibold tracking-wide">Products List</h3>
-                  <button
-                    onClick={() => {
-                      setEditingProduct(null);
-                      clearProductForm();
-                      setIsProductModalOpen(true);
-                    }}
+                  <Link
+                    href="/admin/products/form"
                     className="bg-primary text-primary-foreground px-4 py-2 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 hover:opacity-90 cursor-pointer"
                   >
                     <Plus size={14} />
                     <span>Create Product</span>
-                  </button>
+                  </Link>
                 </div>
 
                 {/* Table */}
@@ -584,13 +1133,13 @@ export default function AdminDashboard() {
                             </td>
                             <td className="py-3 text-right">
                               <div className="flex gap-2.5 justify-end">
-                                <button
-                                  onClick={() => handleEditProductClick(p)}
-                                  className="p-1 hover:text-primary cursor-pointer"
+                                <Link
+                                  href={`/admin/products/form?id=${p.id}`}
+                                  className="p-1 hover:text-primary cursor-pointer flex items-center justify-center"
                                   aria-label="Edit"
                                 >
                                   <Edit2 size={14} />
-                                </button>
+                                </Link>
                                 <button
                                   onClick={() => handleDeleteProduct(p.id)}
                                   className="p-1 hover:text-destructive cursor-pointer"
@@ -703,233 +1252,417 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
+
+            {/* SETTINGS TAB */}
+            {activeTab === "settings" && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-serif text-lg font-semibold tracking-wide text-foreground">Store Settings</h3>
+                  <p className="text-muted-foreground text-xs">Configure global atelier configurations and announcement banners.</p>
+                </div>
+
+                <div className="bg-card border border-border p-6 max-w-2xl space-y-6">
+                  <form onSubmit={handleSaveSettings} className="space-y-5 text-xs">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <label className="font-bold text-muted-foreground uppercase tracking-widest text-[10px]">
+                          Store Announcement Slides
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleAddAnnouncement}
+                          className="text-[10px] font-bold text-primary uppercase tracking-wider hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus size={12} />
+                          <span>Add Slide</span>
+                        </button>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {announcements.map((text, idx) => (
+                          <div key={idx} className="flex gap-2 items-center">
+                            <input
+                              type="text"
+                              required
+                              value={text}
+                              onChange={(e) => handleAnnouncementChange(idx, e.target.value)}
+                              className="flex-1 bg-background border border-border px-3 py-2 text-xs focus:outline-none focus:border-primary text-foreground"
+                              placeholder={`Announcement #${idx + 1}`}
+                            />
+                            {announcements.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveAnnouncement(idx)}
+                                className="text-muted-foreground hover:text-destructive p-2 cursor-pointer"
+                                aria-label="Remove announcement"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">These messages will slide/fade automatically at the top of the header bar.</p>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSavingSettings}
+                      className="px-6 py-2.5 bg-primary text-primary-foreground uppercase tracking-widest font-bold text-xs hover:opacity-90 transition disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSavingSettings ? "Saving..." : "Save Settings"}
+                    </button>
+                    {settingsMsg && (
+                      <p className={`text-xs font-semibold mt-2 ${settingsMsg.startsWith("Error") ? "text-destructive" : "text-accent"}`}>
+                        {settingsMsg}
+                      </p>
+                    )}
+                  </form>
+                </div>
+
+                {/* ── Change Admin Password Card ── */}
+                <div className="bg-card border border-border p-6 max-w-2xl space-y-5">
+                  <div>
+                    <h4 className="font-serif text-base font-semibold text-foreground">Change Admin Password</h4>
+                    <p className="text-muted-foreground text-xs mt-0.5">Update your admin account password.</p>
+                  </div>
+
+                  <form onSubmit={handleChangePassword} className="space-y-4 text-xs" noValidate>
+                    {/* Current Password */}
+                    <div className="space-y-1.5">
+                      <label htmlFor="admin-current-pass" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Current Password
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={13} />
+                        <input
+                          id="admin-current-pass"
+                          type={showCurrentPass ? "text" : "password"}
+                          placeholder="Enter current password"
+                          value={currentPassword}
+                          onChange={(e) => { setCurrentPassword(e.target.value); setPassMsg(""); }}
+                          required
+                          autoComplete="current-password"
+                          className="w-full bg-background border border-border pl-8 pr-8 py-2 text-xs focus:outline-none focus:border-primary transition"
+                        />
+                        <button type="button" onClick={() => setShowCurrentPass(!showCurrentPass)} tabIndex={-1}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer">
+                          {showCurrentPass ? <EyeOff size={13} /> : <Eye size={13} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* New Password */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label htmlFor="admin-new-pass" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          New Password
+                        </label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={13} />
+                          <input
+                            id="admin-new-pass"
+                            type={showNewPass ? "text" : "password"}
+                            placeholder="Min 8 characters"
+                            value={newPassword}
+                            onChange={(e) => { setNewPassword(e.target.value); setPassMsg(""); }}
+                            required
+                            autoComplete="new-password"
+                            className="w-full bg-background border border-border pl-8 pr-8 py-2 text-xs focus:outline-none focus:border-primary transition"
+                          />
+                          <button type="button" onClick={() => setShowNewPass(!showNewPass)} tabIndex={-1}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer">
+                            {showNewPass ? <EyeOff size={13} /> : <Eye size={13} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label htmlFor="admin-confirm-pass" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Confirm New Password
+                        </label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={13} />
+                          <input
+                            id="admin-confirm-pass"
+                            type={showConfirmPass ? "text" : "password"}
+                            placeholder="Repeat new password"
+                            value={confirmPassword}
+                            onChange={(e) => { setConfirmPassword(e.target.value); setPassMsg(""); }}
+                            required
+                            autoComplete="new-password"
+                            className={`w-full bg-background border pl-8 pr-8 py-2 text-xs focus:outline-none transition ${
+                              confirmPassword && confirmPassword !== newPassword ? "border-destructive" : "border-border focus:border-primary"
+                            }`}
+                          />
+                          <button type="button" onClick={() => setShowConfirmPass(!showConfirmPass)} tabIndex={-1}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer">
+                            {showConfirmPass ? <EyeOff size={13} /> : <Eye size={13} />}
+                          </button>
+                        </div>
+                        {confirmPassword && confirmPassword !== newPassword && (
+                          <p className="text-[10px] text-destructive font-semibold">Passwords do not match</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {passMsg && (
+                      <p className={`text-xs font-semibold ${passMsgType === "success" ? "text-accent" : "text-destructive"}`}>
+                        {passMsg}
+                      </p>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={isChangingPass || !currentPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword}
+                      className="px-6 py-2.5 bg-primary text-primary-foreground uppercase tracking-widest font-bold text-xs hover:opacity-90 transition disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      {isChangingPass ? "Updating..." : "Update Password"}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "categories" && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="font-serif text-lg font-semibold tracking-wide text-foreground">Categories Catalog</h3>
+                    <p className="text-muted-foreground text-xs">Manage product groupings and navigation labels.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Category Table */}
+                  <div className="lg:col-span-2 bg-card border border-border p-5 overflow-x-auto rounded-sm">
+                    <table className="w-full text-xs text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-border text-muted-foreground uppercase font-bold text-[9px] tracking-wider">
+                          <th className="py-2.5">Category Name</th>
+                          <th className="py-2.5">Slug</th>
+                          <th className="py-2.5">Description</th>
+                          <th className="py-2.5 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-muted-foreground">
+                        {categories.map((c) => (
+                          <tr key={c.id} className="border-b border-border hover:bg-secondary/10">
+                            <td className="py-3 font-bold text-foreground">{c.name}</td>
+                            <td className="py-3 font-mono">{c.slug}</td>
+                            <td className="py-3 max-w-[200px] truncate">{c.description || "—"}</td>
+                            <td className="py-3 text-right">
+                              <button
+                                onClick={() => handleDeleteCategory(c.id)}
+                                className="p-1 hover:text-destructive cursor-pointer"
+                                aria-label="Delete Category"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Create Category Form */}
+                  <div className="bg-card border border-border p-5 space-y-4 rounded-sm">
+                    <h4 className="font-serif text-sm font-semibold tracking-wide border-b border-border pb-2">
+                      New Category
+                    </h4>
+                    <form onSubmit={handleCreateCategory} className="space-y-4 text-xs">
+                      <div className="space-y-1">
+                        <label className="font-bold text-muted-foreground uppercase tracking-widest text-[9px]">
+                          Category Name
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={newCatName}
+                          onChange={(e) => setNewCatName(e.target.value)}
+                          className="w-full bg-background border border-border px-3 py-2 text-xs focus:outline-none focus:border-primary text-foreground"
+                          placeholder="e.g. Kurta Sets"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-bold text-muted-foreground uppercase tracking-widest text-[9px]">
+                          Description (Optional)
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={newCatDescription}
+                          onChange={(e) => setNewCatDescription(e.target.value)}
+                          className="w-full bg-background border border-border px-3 py-2 text-xs focus:outline-none focus:border-primary text-foreground"
+                          placeholder="Brief description of fabrics or styles"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isSavingCategory}
+                        className="w-full px-4 py-2.5 bg-primary text-primary-foreground uppercase tracking-widest font-bold text-xs hover:opacity-90 disabled:opacity-50 transition cursor-pointer"
+                      >
+                        {isSavingCategory ? "Creating..." : "Add Category"}
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>
 
-      {/* PRODUCT CREATION MODAL */}
-      {isProductModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-          <div className="bg-background border border-border p-6 max-w-lg w-full shadow-2xl relative max-h-[85vh] overflow-y-auto">
-            <h3 className="font-serif text-lg font-semibold tracking-wide mb-4">
-              {editingProduct ? "Edit Product" : "Create New Product"}
-            </h3>
-            <form onSubmit={handleCreateOrUpdateProduct} className="space-y-4 text-xs">
-              <div className="space-y-1">
-                <label className="font-bold text-muted-foreground uppercase tracking-wider">Product Name</label>
-                <input
-                  type="text"
-                  required
-                  value={prodName}
-                  onChange={(e) => setProdName(e.target.value)}
-                  className="w-full bg-card border border-border px-3 py-2 focus:outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-muted-foreground uppercase tracking-wider">Description</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={prodDescription}
-                  onChange={(e) => setProdDescription(e.target.value)}
-                  className="w-full bg-card border border-border px-3 py-2 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-bold text-muted-foreground uppercase tracking-wider">Base Price (INR)</label>
-                  <input
-                    type="number"
-                    required
-                    value={prodPrice}
-                    onChange={(e) => setProdPrice(e.target.value)}
-                    className="w-full bg-card border border-border px-3 py-2 focus:outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-bold text-muted-foreground uppercase tracking-wider">Sale Price (INR)</label>
-                  <input
-                    type="number"
-                    value={prodSalePrice}
-                    onChange={(e) => setProdSalePrice(e.target.value)}
-                    className="w-full bg-card border border-border px-3 py-2 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-bold text-muted-foreground uppercase tracking-wider">Category</label>
-                  <select
-                    value={prodCategoryId}
-                    onChange={(e) => setProdCategoryId(e.target.value)}
-                    className="w-full bg-card border border-border px-3 py-2 focus:outline-none"
-                  >
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="font-bold text-muted-foreground uppercase tracking-wider">Material / Fabric</label>
-                  <input
-                    type="text"
-                    value={prodMaterial}
-                    onChange={(e) => setProdMaterial(e.target.value)}
-                    className="w-full bg-card border border-border px-3 py-2 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-muted-foreground uppercase tracking-wider">Care Instructions</label>
-                <input
-                  type="text"
-                  value={prodCare}
-                  onChange={(e) => setProdCare(e.target.value)}
-                  className="w-full bg-card border border-border px-3 py-2 focus:outline-none"
-                />
-              </div>
-
-              {!editingProduct && (
-                <div className="border border-dashed border-border p-3 space-y-2 bg-secondary/10">
-                  <p className="font-bold text-foreground">Initial Variant & Stock Setup</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Size</label>
-                      <select
-                        value={prodSize}
-                        onChange={(e) => setProdSize(e.target.value)}
-                        className="w-full bg-card border border-border px-2 py-1.5 focus:outline-none"
-                      >
-                        <option value="XS">XS</option>
-                        <option value="S">S</option>
-                        <option value="M">M</option>
-                        <option value="L">L</option>
-                        <option value="XL">XL</option>
-                        <option value="XXL">XXL</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Color</label>
-                      <input
-                        type="text"
-                        value={prodColor}
-                        onChange={(e) => setProdColor(e.target.value)}
-                        className="w-full bg-card border border-border px-2 py-1.5 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Quantity</label>
-                      <input
-                        type="number"
-                        value={prodQuantity}
-                        onChange={(e) => setProdQuantity(e.target.value)}
-                        className="w-full bg-card border border-border px-2 py-1.5 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-4 items-center">
-                <label className="flex items-center gap-2 font-bold cursor-pointer text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={prodIsFeatured}
-                    onChange={(e) => setProdIsFeatured(e.target.checked)}
-                    className="accent-primary"
-                  />
-                  <span>Feature Product</span>
-                </label>
-                <label className="flex items-center gap-2 font-bold cursor-pointer text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={prodIsTrending}
-                    onChange={(e) => setProdIsTrending(e.target.checked)}
-                    className="accent-primary"
-                  />
-                  <span>Trending Edit</span>
-                </label>
-              </div>
-
-              <div className="flex gap-2 justify-end pt-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsProductModalOpen(false);
-                    setEditingProduct(null);
-                  }}
-                  className="px-4 py-2 border border-border uppercase tracking-widest font-bold hover:bg-secondary cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-primary text-primary-foreground uppercase tracking-widest font-bold hover:opacity-90 cursor-pointer"
-                >
-                  {editingProduct ? "Update Catalog" : "Record Product"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ORDER DISPATCH MODAL */}
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-          <div className="bg-background border border-border p-6 max-w-sm w-full shadow-2xl relative text-xs">
-            <h3 className="font-serif text-base font-semibold tracking-wide mb-4">
-              Dispatch Order {selectedOrder.order_number}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-background border border-border p-6 max-w-3xl w-full shadow-2xl relative text-xs rounded-sm my-8">
+            <button
+              onClick={() => setSelectedOrder(null)}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground text-base cursor-pointer"
+            >
+              ✕
+            </button>
+            
+            <h3 className="font-serif text-lg font-semibold tracking-wide mb-6 border-b border-border pb-3">
+              Order Details & Dispatch: {selectedOrder.order_number}
             </h3>
-            <form onSubmit={handleOrderUpdate} className="space-y-4">
-              <div className="space-y-1">
-                <label className="font-bold text-muted-foreground uppercase tracking-wider">Status</label>
-                <select
-                  value={orderStatus}
-                  onChange={(e) => setOrderStatus(e.target.value)}
-                  className="w-full bg-card border border-border px-3 py-2 focus:outline-none"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="processing">Processing</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Left Column: Customer details, address, payment details */}
+              <div className="space-y-5">
+                <div>
+                  <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Shipping Information</h4>
+                  <div className="bg-secondary/10 border border-border/60 p-3 space-y-1 text-foreground">
+                    <p className="font-bold">{selectedOrder.shipping_address?.fullName || "Guest Patron"}</p>
+                    {selectedOrder.shipping_address?.phone && (
+                      <p><span className="text-muted-foreground">Phone:</span> {selectedOrder.shipping_address.phone}</p>
+                    )}
+                    <p>{selectedOrder.shipping_address?.addressLine1}</p>
+                    {selectedOrder.shipping_address?.addressLine2 && <p>{selectedOrder.shipping_address.addressLine2}</p>}
+                    <p>
+                      {selectedOrder.shipping_address?.city}, {selectedOrder.shipping_address?.state} - {selectedOrder.shipping_address?.postalCode}
+                    </p>
+                    <p>{selectedOrder.shipping_address?.country || "India"}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Payment Details</h4>
+                  <table className="w-full text-xs">
+                    <tbody>
+                      <tr className="border-b border-border/30 py-1.5 flex justify-between">
+                        <td className="text-muted-foreground">Payment Method:</td>
+                        <td className="font-semibold uppercase text-foreground">{selectedOrder.payment_method || "COD"}</td>
+                      </tr>
+                      <tr className="border-b border-border/30 py-1.5 flex justify-between">
+                        <td className="text-muted-foreground">Payment Status:</td>
+                        <td className="font-bold uppercase text-foreground">{selectedOrder.payment_status || "Unpaid"}</td>
+                      </tr>
+                      <tr className="border-b border-border/30 py-1.5 flex justify-between">
+                        <td className="text-muted-foreground">Subtotal:</td>
+                        <td className="font-semibold text-foreground">{formatPrice(selectedOrder.subtotal)}</td>
+                      </tr>
+                      {selectedOrder.discount_amount > 0 && (
+                        <tr className="border-b border-border/30 py-1.5 flex justify-between">
+                          <td className="text-muted-foreground">Discount ({selectedOrder.coupon_code || "Coupon"}):</td>
+                          <td className="font-semibold text-destructive">-{formatPrice(selectedOrder.discount_amount)}</td>
+                        </tr>
+                      )}
+                      <tr className="border-b border-border/30 py-1.5 flex justify-between">
+                        <td className="text-muted-foreground">Shipping:</td>
+                        <td className="font-semibold text-foreground">{formatPrice(selectedOrder.shipping)}</td>
+                      </tr>
+                      <tr className="py-2 flex justify-between text-sm font-bold border-t border-border">
+                        <td className="text-foreground">Total:</td>
+                        <td className="text-accent">{formatPrice(selectedOrder.total)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="font-bold text-muted-foreground uppercase tracking-wider">Tracking Number</label>
-                <input
-                  type="text"
-                  placeholder="Courier Tracking Reference"
-                  value={orderTracking}
-                  onChange={(e) => setOrderTracking(e.target.value)}
-                  className="w-full bg-card border border-border px-3 py-2 focus:outline-none"
-                />
-              </div>
+              {/* Right Column: Ordered items and Status update form */}
+              <div className="space-y-5">
+                <div>
+                  <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Ordered Items</h4>
+                  <div className="space-y-3 max-h-[180px] overflow-y-auto pr-1 border border-border/40 p-3 bg-secondary/5">
+                    {selectedOrder.order_items && selectedOrder.order_items.length > 0 ? (
+                      selectedOrder.order_items.map((item: any, idx: number) => {
+                        const fc = item.product?.colors?.[0];
+                        const img = fc?.images?.[0]?.image || fc?.thumbnail || "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=400&auto=format&fit=crop";
+                        return (
+                          <div key={idx} className="flex gap-3 text-xs items-center justify-between">
+                            <div className="flex gap-2 items-center">
+                              <div className="relative w-8 h-10 border border-border shrink-0">
+                                <Image src={img} alt={item.product?.name || ""} fill className="object-cover" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-foreground truncate max-w-[150px]">{item.product?.name || "Product Name"}</p>
+                                <p className="text-[10px] text-muted-foreground">Qty: {item.quantity}</p>
+                              </div>
+                            </div>
+                            <span className="font-semibold text-foreground">{formatPrice(item.price)}</span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-muted-foreground text-center py-4">No item details found.</p>
+                    )}
+                  </div>
+                </div>
 
-              <div className="flex gap-2 justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedOrder(null)}
-                  className="px-4 py-2 border border-border uppercase tracking-widest font-bold hover:bg-secondary cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-primary text-primary-foreground uppercase tracking-widest font-bold hover:opacity-90 cursor-pointer"
-                >
-                  Save Dispatch
-                </button>
+                <div>
+                  <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Dispatch Control</h4>
+                  <form onSubmit={handleOrderUpdate} className="space-y-3 bg-secondary/10 border border-border/60 p-4">
+                    <div className="space-y-1">
+                      <label className="font-bold text-muted-foreground uppercase tracking-wider text-[9px]">Status</label>
+                      <select
+                        value={orderStatus}
+                        onChange={(e) => setOrderStatus(e.target.value)}
+                        className="w-full bg-background border border-border px-3 py-2 focus:outline-none"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-muted-foreground uppercase tracking-wider text-[9px]">Tracking Number</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Courier Tracking Reference"
+                        value={orderTracking}
+                        onChange={(e) => setOrderTracking(e.target.value)}
+                        className="w-full bg-background border border-border px-3 py-2 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="flex gap-2 justify-end pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrder(null)}
+                        className="px-4 py-2 border border-border uppercase tracking-widest font-bold hover:bg-secondary cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-primary text-primary-foreground uppercase tracking-widest font-bold hover:opacity-90 cursor-pointer"
+                      >
+                        Save Dispatch
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}

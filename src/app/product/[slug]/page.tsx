@@ -10,67 +10,69 @@ interface ProductPageProps {
   }>;
 }
 
-// Fallback Mock Product Detail
+// Fallback Mock Product Detail (conforming to the new nested color variant structure)
 const MOCK_DETAILS: Record<string, ProductDetails> = {
   "ivory-chikankari-embroidered-kurti": {
     id: "e1111111-1111-1111-1111-111111111111",
     name: "Ivory Chikankari Embroidered Kurti",
     slug: "ivory-chikankari-embroidered-kurti",
     description: "Experience pure artisanal luxury with this ivory straight kurti. Adorned with intricate hand-embroidered chikankari shadows and floral motifs, this piece is crafted from premium georgette. Comes with a matching cotton inner slip.",
-    price: 2499,
-    sale_price: 1999,
-    material: "Premium Georgette with Cotton Slip",
-    care_instructions: "Dry Clean Recommended. Gentle hand wash inside out in cold water.",
-    category: { name: "Kurtis", slug: "kurtis" },
-    variants: [
-      { id: "f1111111-1111-1111-1111-111111111111", size: "S", color: "Ivory", quantity: 10 },
-      { id: "f1111112-1111-1111-1111-111111111112", size: "M", color: "Ivory", quantity: 15 },
-      { id: "f1111113-1111-1111-1111-111111111113", size: "L", color: "Ivory", quantity: 20 },
-      { id: "f1111114-1111-1111-1111-111111111114", size: "XL", color: "Ivory", quantity: 5 },
-    ],
-    images: [
-      { url: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=800&auto=format&fit=crop", alt_text: "Ivory Chikankari Kurti Front" },
-      { url: "https://images.unsplash.com/photo-1610030470298-4c6e6d15b026?q=80&w=800&auto=format&fit=crop", alt_text: "Ivory Chikankari Kurti Detail" },
-    ],
+    brand: "Vastrarupa",
+    category: "Kurtis",
+    mrp: 2499,
+    selling_price: 1999,
+    fabric: "Premium Georgette with Cotton Slip",
+    fit: "Straight Fit",
+    colors: [
+      {
+        id: "b1111111-1111-1111-1111-111111111111",
+        name: "Ivory",
+        hex: "#FFFFF0",
+        sku: "SKU-IVY-CK",
+        thumbnail: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=400&auto=format&fit=crop",
+        gallery: [
+          "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=1000&auto=format&fit=crop",
+          "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=1000&auto=format&fit=crop"
+        ],
+        sizes: [
+          { id: "f1111111-1111-1111-1111-111111111111", size: "S", stock: 12, sku: "SKU-IVY-CK-S" },
+          { id: "f1111112-1111-1111-1111-111111111112", size: "M", stock: 20, sku: "SKU-IVY-CK-M" },
+          { id: "f1111113-1111-1111-1111-111111111113", size: "L", stock: 15, sku: "SKU-IVY-CK-L" },
+          { id: "f1111114-1111-1111-1111-111111111114", size: "XL", stock: 5, sku: "SKU-IVY-CK-XL" }
+        ]
+      }
+    ]
   },
   "crimson-anarkali-georgette-kurti": {
     id: "e1111112-1111-1111-1111-111111111112",
     name: "Crimson Anarkali Georgette Kurti",
     slug: "crimson-anarkali-georgette-kurti",
     description: "Make an entrance in this majestic crimson red Anarkali kurti. Featuring 24 flares for an elegant flow, it displays a delicate gota patti neckline border and gold lace details along the hem. Includes a soft crepe lining.",
-    price: 3999,
-    sale_price: 3499,
-    material: "Faux Georgette with Crepe Lining",
-    care_instructions: "Dry clean only. Iron on reverse low heat.",
-    category: { name: "Kurtis", slug: "kurtis" },
-    variants: [
-      { id: "f1111121-1111-1111-1111-111111111121", size: "S", color: "Crimson Red", quantity: 8 },
-      { id: "f1111122-1111-1111-1111-111111111122", size: "M", color: "Crimson Red", quantity: 12 },
-      { id: "f1111123-1111-1111-1111-111111111123", size: "L", color: "Crimson Red", quantity: 7 },
-    ],
-    images: [
-      { url: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?q=80&w=800&auto=format&fit=crop", alt_text: "Crimson Anarkali" },
-    ],
-  },
-  "emerald-silk-brocade-kurta-set": {
-    id: "e2222221-2222-2222-2222-222222222221",
-    name: "Emerald Silk Brocade Kurta Set",
-    slug: "emerald-silk-brocade-kurta-set",
-    description: "A celebration of Indian weaves, this emerald green kurta set features rich Banarasi brocade motifs. The kurta is straight and structured, paired with solid emerald cigarette pants and a sheer golden organza dupatta with scalloped borders.",
-    price: 6999,
-    sale_price: 5999,
-    material: "Banarasi Silk Brocade & Organza",
-    care_instructions: "Dry clean only.",
-    category: { name: "Kurta Sets", slug: "kurta-sets" },
-    variants: [
-      { id: "f2222211-2222-2222-2222-222222222211", size: "S", color: "Emerald Green", quantity: 4 },
-      { id: "f2222212-2222-2222-2222-222222222212", size: "M", color: "Emerald Green", quantity: 10 },
-      { id: "f2222213-2222-2222-2222-222222222213", size: "L", color: "Emerald Green", quantity: 6 },
-    ],
-    images: [
-      { url: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?q=80&w=800&auto=format&fit=crop", alt_text: "Emerald Brocade Set" },
-    ],
-  },
+    brand: "Vastrarupa",
+    category: "Kurtis",
+    mrp: 3999,
+    selling_price: 3499,
+    fabric: "Faux Georgette with Crepe Lining",
+    fit: "Anarkali Flare",
+    colors: [
+      {
+        id: "b1111112-1111-1111-1111-111111111112",
+        name: "Crimson Red",
+        hex: "#990000",
+        sku: "SKU-CRMSN-AN",
+        thumbnail: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?q=80&w=400&auto=format&fit=crop",
+        gallery: [
+          "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?q=80&w=1000&auto=format&fit=crop",
+          "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=1000&auto=format&fit=crop"
+        ],
+        sizes: [
+          { id: "f1111121-1111-1111-1111-111111111121", size: "S", stock: 8, sku: "SKU-CRMSN-AN-S" },
+          { id: "f1111122-1111-1111-1111-111111111122", size: "M", stock: 12, sku: "SKU-CRMSN-AN-M" },
+          { id: "f1111123-1111-1111-1111-111111111123", size: "L", stock: 7, sku: "SKU-CRMSN-AN-L" }
+        ]
+      }
+    ]
+  }
 };
 
 const MOCK_REVIEWS = [
@@ -120,7 +122,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     openGraph: {
       title: mockProduct ? `${mockProduct.name} | Vastrarupa` : "Vastrarupa Luxury Wear",
       description: mockProduct?.description || "Premium ethnic wear.",
-      images: mockProduct?.images?.[0]?.url ? [mockProduct.images[0].url] : [],
+      images: mockProduct?.colors?.[0]?.thumbnail ? [mockProduct.colors[0].thumbnail] : [],
     },
   };
 }
@@ -135,14 +137,33 @@ export default async function ProductPage({ params }: ProductPageProps) {
   try {
     const supabase = await createClient();
 
-    // 1. Fetch product
+    // 1. Fetch product with new colors and sizes schema
     const { data: dbProduct } = await supabase
       .from("products")
       .select(`
-        id, category_id, name, slug, description, price, sale_price, material, care_instructions, status, is_featured, is_trending,
-        category:categories(name, slug),
-        variants:product_variants(id, size, color, inventory(quantity)),
-        images:product_images(url, alt_text)
+        id, category_id, name, slug, description, brand, category, mrp, selling_price, fabric, fit, status, is_featured, is_trending,
+        colors:product_colors (
+          id, 
+          color_name, 
+          hex_code, 
+          sku, 
+          thumbnail, 
+          display_order, 
+          status,
+          sizes:product_sizes (
+            id, 
+            size, 
+            stock, 
+            price_override, 
+            mrp_override, 
+            sku
+          ),
+          images:product_images (
+            id, 
+            image, 
+            display_order
+          )
+        )
       `)
       .eq("slug", slug)
       .single();
@@ -153,21 +174,33 @@ export default async function ProductPage({ params }: ProductPageProps) {
         name: dbProduct.name,
         slug: dbProduct.slug,
         description: dbProduct.description,
-        price: Number(dbProduct.price),
-        sale_price: dbProduct.sale_price ? Number(dbProduct.sale_price) : null,
-        material: dbProduct.material,
-        care_instructions: dbProduct.care_instructions,
-        category: dbProduct.category ? {
-          name: (dbProduct.category as any).name || (dbProduct.category as any)[0]?.name,
-          slug: (dbProduct.category as any).slug || (dbProduct.category as any)[0]?.slug
-        } : null,
-        variants: (dbProduct.variants || []).map((v: any) => ({
-          id: v.id,
-          size: v.size,
-          color: v.color,
-          quantity: v.inventory?.[0]?.quantity || 0,
-        })),
-        images: dbProduct.images || [],
+        brand: dbProduct.brand || "Vastrarupa",
+        category: dbProduct.category,
+        mrp: Number(dbProduct.mrp),
+        selling_price: Number(dbProduct.selling_price),
+        fabric: dbProduct.fabric,
+        fit: dbProduct.fit,
+        colors: (dbProduct.colors || [])
+          .filter((c: any) => c.status === "active")
+          .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
+          .map((c: any) => ({
+            id: c.id,
+            name: c.color_name,
+            hex: c.hex_code,
+            sku: c.sku,
+            thumbnail: c.thumbnail,
+            gallery: (c.images || [])
+              .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
+              .map((img: any) => img.image),
+            sizes: (c.sizes || []).map((s: any) => ({
+              id: s.id,
+              size: s.size,
+              stock: Number(s.stock),
+              price_override: s.price_override ? Number(s.price_override) : null,
+              mrp_override: s.mrp_override ? Number(s.mrp_override) : null,
+              sku: s.sku,
+            })),
+          })),
       };
 
       // 2. Fetch reviews
@@ -182,41 +215,60 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
       reviews = dbReviews || [];
 
-      // 3. Fetch related products
+      // 3. Fetch related products using new nested structure
       const { data: dbRelated } = await supabase
         .from("products")
         .select(`
-          id, name, slug, price, sale_price, material, is_trending, is_featured,
-          category:categories(name, slug),
-          variants:product_variants(id, size, color, inventory(quantity)),
-          images:product_images(url, alt_text)
+          id, name, slug, mrp, selling_price, fabric, is_trending, is_featured, category,
+          colors:product_colors (
+            id, 
+            color_name, 
+            hex_code, 
+            thumbnail,
+            sizes:product_sizes (
+              id, 
+              size, 
+              stock
+            ),
+            images:product_images (
+              image
+            )
+          )
         `)
         .eq("category_id", dbProduct.category_id)
         .neq("id", product.id)
         .limit(4);
 
       if (dbRelated) {
-        relatedProducts = dbRelated.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          slug: p.slug,
-          price: Number(p.price),
-          sale_price: p.sale_price ? Number(p.sale_price) : null,
-          material: p.material,
-          is_trending: p.is_trending,
-          is_featured: p.is_featured,
-          category: p.category ? {
-            name: (p.category as any).name || (p.category as any)[0]?.name,
-            slug: (p.category as any).slug || (p.category as any)[0]?.slug
-          } : null,
-          variants: (p.variants || []).map((v: any) => ({
-            id: v.id,
-            size: v.size,
-            color: v.color,
-            quantity: v.inventory?.[0]?.quantity || 0,
-          })),
-          images: p.images || [],
-        }));
+        relatedProducts = dbRelated.map((p: any) => {
+          const firstColor = p.colors?.[0] || { color_name: "Default", thumbnail: "", sizes: [], images: [] };
+          return {
+            id: p.id,
+            name: p.name,
+            slug: p.slug,
+            price: Number(p.mrp),
+            sale_price: p.selling_price ? Number(p.selling_price) : null,
+            material: p.fabric,
+            is_trending: p.is_trending,
+            is_featured: p.is_featured,
+            category: p.category ? {
+              name: p.category,
+              slug: p.category.toLowerCase().replace(/\s+/g, "-"),
+            } : null,
+            variants: (firstColor.sizes || []).map((s: any) => ({
+              id: s.id,
+              size: s.size,
+              color: firstColor.color_name,
+              quantity: s.stock || 0,
+            })),
+            images: (firstColor.images || []).map((img: any) => ({
+              url: img.image,
+              alt_text: "",
+            })).concat(
+              firstColor.thumbnail ? [{ url: firstColor.thumbnail, alt_text: "" }] : []
+            ),
+          };
+        });
       }
     }
   } catch (error) {
@@ -234,12 +286,15 @@ export default async function ProductPage({ params }: ProductPageProps) {
     notFound();
   }
 
+  // Determine available stock in schema JSON
+  const hasInStock = product.colors.some((c) => c.sizes.some((s) => s.stock > 0));
+
   // Structured Schema (JSON-LD)
   const schemaJson = {
     "@context": "https://schema.org",
     "@type": "Product",
     "name": product.name,
-    "image": product.images.map((i) => i.url),
+    "image": product.colors?.[0]?.gallery || [],
     "description": product.description,
     "sku": product.slug,
     "brand": {
@@ -250,9 +305,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
       "@type": "Offer",
       "url": `https://vastrarupa.vercel.app/product/${product.slug}`,
       "priceCurrency": "INR",
-      "price": product.sale_price !== null ? product.sale_price : product.price,
+      "price": product.selling_price,
       "itemCondition": "https://schema.org/NewCondition",
-      "availability": product.variants.some((v) => v.quantity > 0)
+      "availability": hasInStock
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
     },
@@ -270,7 +325,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
       {/* Related Products Grid */}
       {relatedProducts.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 space-y-8">
+        <section className="w-full px-4 sm:px-6 pb-16 space-y-8">
           <div className="space-y-2">
             <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-muted-foreground">Atelier Edits</span>
             <h2 className="font-serif text-2xl font-semibold tracking-wide">You May Also Cherish</h2>

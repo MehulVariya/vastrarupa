@@ -4,9 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { Send, Phone, Mail, MapPin } from "lucide-react";
 
+import { usePathname } from "next/navigation";
+
 export default function Footer() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const pathname = usePathname();
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
@@ -15,10 +18,14 @@ export default function Footer() {
     setEmail("");
   };
 
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
+
   return (
     <footer className="bg-card border-t border-border mt-auto">
       {/* Top newsletter banner */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 border-b border-border">
+      <div className="w-full px-4 sm:px-6 py-12 md:py-16 border-b border-border">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
           <div className="space-y-2">
             <h3 className="font-serif text-2xl tracking-wide text-foreground">Subscribe to our Edit</h3>
@@ -55,7 +62,7 @@ export default function Footer() {
       </div>
 
       {/* Main Footer Links */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div className="w-full px-4 sm:px-6 py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {/* Brand Column */}
         <div className="space-y-4">
           <h4 className="font-serif text-lg font-bold tracking-widest text-foreground">VASTRARUPA</h4>
@@ -141,7 +148,7 @@ export default function Footer() {
 
       {/* Bottom Legal & Payment Row */}
       <div className="bg-background border-t border-border py-6 text-center text-[10px] text-muted-foreground">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="w-full px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p>© {new Date().getFullYear()} VASTRARUPA Private Limited. All Rights Reserved.</p>
           <div className="flex items-center gap-4">
             <span className="tracking-widest uppercase font-semibold text-[8px] border border-border px-1.5 py-0.5 rounded-sm">Razorpay</span>

@@ -4,7 +4,7 @@ import { useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Loader2, Lock, Mail, AlertCircle, Sparkles } from "lucide-react";
+import { Loader2, Lock, Mail, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/features/auth/useAuth";
 
 function LoginForm() {
@@ -15,6 +15,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -32,48 +33,32 @@ function LoginForm() {
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Map Supabase error codes to friendly messages — never throw, always show inline
+        if (
+          error.message.toLowerCase().includes("invalid login credentials") ||
+          error.message.toLowerCase().includes("invalid credentials") ||
+          error.message.toLowerCase().includes("email not confirmed")
+        ) {
+          setErrorMsg("Incorrect email or password. Please try again.");
+        } else if (error.message.toLowerCase().includes("too many requests")) {
+          setErrorMsg("Too many attempts. Please wait a few minutes and try again.");
+        } else if (error.message.toLowerCase().includes("network")) {
+          setErrorMsg("Connection error. Please check your internet and try again.");
+        } else {
+          setErrorMsg(error.message || "Login failed. Please try again.");
+        }
+        setIsLoading(false);
+        return;
+      }
 
-      // Initialize auth state store
+      // Success — initialize auth state and redirect
       await initialize();
       router.push(nextRoute);
     } catch (err: any) {
-      console.error("Login failed:", err);
-      
-      // Safety mock fallback for preview/offline mode
-      if (password === "password123") {
-        setErrorMsg("");
-        // Try signup if password matches standard pattern, or mock log in
-        // Let's mock a session in localStorage or just show success
-        alert(
-          "Supabase credentials not configured in environmental variables. Mocking login session..."
-        );
-        
-        // Save mock login in localStorage to let the app simulate authenticated state
-        localStorage.setItem(
-          "sb-placeholder-session",
-          JSON.stringify({
-            user: { email, id: "placeholder-id-123" },
-            role: email.includes("admin") ? "admin" : "customer",
-            name: email.includes("admin") ? "Atelier Administrator" : "Royal Patron",
-          })
-        );
-        window.location.href = nextRoute;
-      } else {
-        setErrorMsg(err.message || "Invalid credentials. Try password123 as mockup.");
-      }
-    } finally {
+      // Fallback catch — should not normally be reached
+      setErrorMsg("Something went wrong. Please try again.");
       setIsLoading(false);
-    }
-  };
-
-  const fillMockCredentials = (role: "customer" | "admin") => {
-    if (role === "customer") {
-      setEmail("customer@vastrarupa.com");
-      setPassword("password123");
-    } else {
-      setEmail("admin@vastrarupa.com");
-      setPassword("password123");
     }
   };
 
@@ -81,93 +66,83 @@ function LoginForm() {
     <div className="max-w-md w-full mx-auto bg-card border border-border p-6 sm:p-8 space-y-6">
       <div className="text-center space-y-1">
         <h1 className="font-serif text-2xl sm:text-3xl font-bold tracking-wide">Welcome Back</h1>
-        <p className="text-muted-foreground text-xs">Enter your details to access your atelier profile</p>
+        <p className="text-muted-foreground text-xs">Sign in to your Vastrarupa account</p>
       </div>
 
+      {/* Inline error popup — shown instead of Next.js overlay */}
       {errorMsg && (
-        <div className="flex items-center gap-2 text-destructive bg-destructive/10 border border-destructive/20 p-3 rounded-sm text-xs font-semibold">
-          <AlertCircle size={16} />
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 bg-destructive/10 border border-destructive/25 text-destructive px-4 py-3 rounded-sm text-xs font-semibold animate-in fade-in duration-200"
+        >
+          <AlertCircle size={15} className="shrink-0 mt-0.5" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      <form onSubmit={handleLogin} className="space-y-4">
+      <form onSubmit={handleLogin} className="space-y-4" noValidate>
+        {/* Email */}
         <div className="space-y-1.5">
-          <label htmlFor="login-email" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Email Address</label>
+          <label htmlFor="login-email" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            Email Address
+          </label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={14} />
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
             <input
               id="login-email"
               type="email"
-              placeholder="patron@vastrarupa.com"
+              placeholder="you@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { setEmail(e.target.value); setErrorMsg(""); }}
               required
-              className="w-full bg-background border border-border pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-primary"
+              autoComplete="email"
+              className="w-full bg-background border border-border pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-primary transition"
             />
           </div>
         </div>
 
+        {/* Password */}
         <div className="space-y-1.5">
           <div className="flex justify-between items-center">
-            <label htmlFor="login-password" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Password</label>
-            <Link href="/login" className="text-[10px] text-muted-foreground hover:text-primary hover:underline font-semibold">
-              Forgot Password?
-            </Link>
+            <label htmlFor="login-password" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Password
+            </label>
           </div>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={14} />
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
             <input
               id="login-password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="••••••••"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); setErrorMsg(""); }}
               required
-              className="w-full bg-background border border-border pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-primary"
+              autoComplete="current-password"
+              className="w-full bg-background border border-border pl-9 pr-9 py-2.5 text-xs focus:outline-none focus:border-primary transition"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition cursor-pointer"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
           </div>
         </div>
 
         <button
           type="submit"
-          disabled={isLoading}
-          className="w-full bg-primary text-primary-foreground h-10 font-bold text-xs uppercase tracking-widest hover:opacity-95 transition flex items-center justify-center gap-1.5 cursor-pointer"
+          disabled={isLoading || !email || !password}
+          className="w-full bg-primary text-primary-foreground h-10 font-bold text-xs uppercase tracking-widest hover:opacity-95 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isLoading ? (
-            <Loader2 className="animate-spin" size={16} />
+            <><Loader2 className="animate-spin" size={15} /><span>Signing in...</span></>
           ) : (
             <span>Log In</span>
           )}
         </button>
       </form>
-
-      {/* Mock login assistance panel */}
-      <div className="border border-dashed border-border p-4 bg-secondary/20 space-y-3 rounded-sm">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-primary uppercase tracking-wider">
-          <Sparkles size={14} />
-          <span>Atelier Preview Helpers</span>
-        </div>
-        <p className="text-[10px] text-muted-foreground leading-relaxed">
-          Use the presets below to preview the platform features. Password is <span className="font-semibold text-foreground">password123</span>.
-        </p>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => fillMockCredentials("customer")}
-            className="flex-1 py-1.5 border border-border bg-background text-[10px] font-bold uppercase hover:bg-secondary cursor-pointer"
-          >
-            Patron Account
-          </button>
-          <button
-            type="button"
-            onClick={() => fillMockCredentials("admin")}
-            className="flex-1 py-1.5 border border-border bg-background text-[10px] font-bold uppercase hover:bg-secondary cursor-pointer"
-          >
-            Admin Account
-          </button>
-        </div>
-      </div>
 
       <p className="text-center text-xs text-muted-foreground">
         New to Vastrarupa?{" "}

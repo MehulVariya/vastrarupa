@@ -5,6 +5,7 @@ import ThemeProvider from "@/components/provider/ThemeProvider";
 import QueryProvider from "@/components/provider/QueryProvider";
 import Header from "@/components/common/Header";
 import Footer from "@/components/common/Footer";
+import AuthHashRedirect from "@/components/common/AuthHashRedirect";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -65,6 +66,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <QueryProvider>
           <ThemeProvider>
+            <AuthHashRedirect />
             <Header />
             <main className="flex-1 flex flex-col">{children}</main>
             <Footer />

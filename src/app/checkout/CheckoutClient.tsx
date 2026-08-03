@@ -178,7 +178,7 @@ export default function CheckoutClient() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative">
+    <div className="w-full px-4 sm:px-6 py-12 relative">
       {/* simulated secure payment processing screen */}
       {isProcessing && (
         <div className="fixed inset-0 z-50 bg-background/95 flex flex-col items-center justify-center space-y-6">

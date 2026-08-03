@@ -61,10 +61,12 @@ CREATE TABLE public.products (
     name TEXT NOT NULL,
     slug TEXT NOT NULL UNIQUE,
     description TEXT NOT NULL,
-    price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
-    sale_price NUMERIC(10,2) CHECK (sale_price >= 0 AND sale_price <= price),
-    material TEXT,
-    care_instructions TEXT,
+    brand TEXT DEFAULT 'Vastrarupa',
+    category TEXT,
+    mrp NUMERIC(10,2) NOT NULL CHECK (mrp >= 0),
+    selling_price NUMERIC(10,2) NOT NULL CHECK (selling_price >= 0 AND selling_price <= mrp),
+    fabric TEXT,
+    fit TEXT,
     status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'out_of_stock')),
     is_featured BOOLEAN DEFAULT false,
     is_trending BOOLEAN DEFAULT false,
@@ -74,37 +76,41 @@ CREATE TABLE public.products (
 
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 
--- 6. PRODUCT_VARIANTS Table
-CREATE TABLE public.product_variants (
+-- 6. PRODUCT_COLORS Table
+CREATE TABLE public.product_colors (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID REFERENCES public.products(id) ON DELETE CASCADE NOT NULL,
+    color_name TEXT NOT NULL,
+    hex_code TEXT NOT NULL,
     sku TEXT UNIQUE NOT NULL,
-    size TEXT NOT NULL CHECK (size IN ('XS', 'S', 'M', 'L', 'XL', 'XXL', 'One Size')),
-    color TEXT NOT NULL,
-    price_override NUMERIC(10,2) CHECK (price_override >= 0),
+    thumbnail TEXT NOT NULL,
+    display_order INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL
 );
 
-ALTER TABLE public.product_variants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.product_colors ENABLE ROW LEVEL SECURITY;
 
--- 7. INVENTORY Table
-CREATE TABLE public.inventory (
+-- 7. PRODUCT_SIZES Table
+CREATE TABLE public.product_sizes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    variant_id UUID REFERENCES public.product_variants(id) ON DELETE CASCADE UNIQUE NOT NULL,
-    quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL
+    product_color_id UUID REFERENCES public.product_colors(id) ON DELETE CASCADE NOT NULL,
+    size TEXT NOT NULL CHECK (size IN ('XS', 'S', 'M', 'L', 'XL', 'XXL', 'One Size')),
+    stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+    price_override NUMERIC(10,2) CHECK (price_override >= 0),
+    mrp_override NUMERIC(10,2) CHECK (mrp_override >= 0),
+    sku TEXT UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL
 );
 
-ALTER TABLE public.inventory ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.product_sizes ENABLE ROW LEVEL SECURITY;
 
 -- 8. PRODUCT_IMAGES Table
 CREATE TABLE public.product_images (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_id UUID REFERENCES public.products(id) ON DELETE CASCADE NOT NULL,
-    variant_id UUID REFERENCES public.product_variants(id) ON DELETE CASCADE,
-    url TEXT NOT NULL,
-    is_featured BOOLEAN DEFAULT false,
-    alt_text TEXT,
+    product_color_id UUID REFERENCES public.product_colors(id) ON DELETE CASCADE NOT NULL,
+    image TEXT NOT NULL,
+    display_order INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL
 );
 
@@ -156,7 +162,7 @@ CREATE TABLE public.order_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     order_id UUID REFERENCES public.orders(id) ON DELETE CASCADE NOT NULL,
     product_id UUID REFERENCES public.products(id) ON DELETE SET NULL NOT NULL,
-    variant_id UUID REFERENCES public.product_variants(id) ON DELETE SET NULL NOT NULL,
+    variant_id UUID REFERENCES public.product_sizes(id) ON DELETE SET NULL NOT NULL,
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     price NUMERIC(10,2) NOT NULL CHECK (price >= 0)
 );
@@ -167,7 +173,7 @@ ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
 CREATE TABLE public.cart (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-    variant_id UUID REFERENCES public.product_variants(id) ON DELETE CASCADE NOT NULL,
+    variant_id UUID REFERENCES public.product_sizes(id) ON DELETE CASCADE NOT NULL,
     quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
     UNIQUE(user_id, variant_id)
@@ -344,12 +350,12 @@ CREATE POLICY "Admins can manage collections" ON public.collections FOR ALL USIN
 CREATE POLICY "Published products are viewable by everyone" ON public.products FOR SELECT USING (status = 'published' OR public.is_admin());
 CREATE POLICY "Admins can manage products" ON public.products FOR ALL USING (public.is_admin());
 
-CREATE POLICY "Product variants are viewable by everyone" ON public.product_variants FOR SELECT USING (true);
-CREATE POLICY "Admins can manage product variants" ON public.product_variants FOR ALL USING (public.is_admin());
+CREATE POLICY "Product colors are viewable by everyone" ON public.product_colors FOR SELECT USING (true);
+CREATE POLICY "Admins can manage product colors" ON public.product_colors FOR ALL USING (public.is_admin());
 
--- Inventory RLS
-CREATE POLICY "Inventory is viewable by everyone" ON public.inventory FOR SELECT USING (true);
-CREATE POLICY "Admins can manage inventory" ON public.inventory FOR ALL USING (public.is_admin());
+-- 15. Product Sizes RLS
+CREATE POLICY "Product sizes are viewable by everyone" ON public.product_sizes FOR SELECT USING (true);
+CREATE POLICY "Admins can manage product sizes" ON public.product_sizes FOR ALL USING (public.is_admin());
 
 -- Product Images RLS
 CREATE POLICY "Product images are viewable by everyone" ON public.product_images FOR SELECT USING (true);

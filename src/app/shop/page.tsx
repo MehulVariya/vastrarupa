@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import ProductCard, { Product } from "@/features/products/ProductCard";
 import Link from "next/link";
-import { SlidersHorizontal, ArrowUpDown, ChevronRight } from "lucide-react";
+import { SlidersHorizontal, ArrowUpDown, ChevronRight, Sparkles } from "lucide-react";
 
 interface ShopPageProps {
   searchParams: Promise<{
@@ -166,19 +166,28 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
     let query = supabase
       .from("products")
       .select(`
-        id, name, slug, price, sale_price, material, is_trending, is_featured,
-        category:categories(name, slug),
-        variants:product_variants(id, size, color, inventory(quantity)),
-        images:product_images(url, alt_text)
+        id, name, slug, mrp, selling_price, fabric, is_trending, is_featured, category,
+        colors:product_colors (
+          id, 
+          color_name, 
+          hex_code, 
+          thumbnail,
+          status,
+          sizes:product_sizes (
+            id, 
+            size, 
+            stock
+          ),
+          images:product_images (
+            image
+          )
+        )
       `)
       .eq("status", "published");
 
-    // Apply category filter
+    // Apply category filter (checks direct text categories)
     if (category) {
-      const selectedCat = categories.find((c) => c.slug === category);
-      if (selectedCat) {
-        query = query.eq("category_id", selectedCat.id);
-      }
+      query = query.ilike("category", `%${category}%`);
     }
 
     // Apply search filter
@@ -186,11 +195,11 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
       query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
     }
 
-    // Apply sorting
+    // Apply sorting (on selling_price instead of price)
     if (sort === "price_asc") {
-      query = query.order("price", { ascending: true });
+      query = query.order("selling_price", { ascending: true });
     } else if (sort === "price_desc") {
-      query = query.order("price", { ascending: false });
+      query = query.order("selling_price", { ascending: false });
     } else {
       query = query.order("created_at", { ascending: false });
     }
@@ -198,30 +207,41 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
     const { data: dbProducts } = await query;
 
     if (dbProducts && dbProducts.length > 0) {
-      products = dbProducts.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        slug: p.slug,
-        price: Number(p.price),
-        sale_price: p.sale_price ? Number(p.sale_price) : null,
-        material: p.material,
-        is_trending: p.is_trending,
-        is_featured: p.is_featured,
-        category: p.category ? { name: p.category.name, slug: p.category.slug } : null,
-        variants: (p.variants || []).map((v: any) => ({
-          id: v.id,
-          size: v.size,
-          color: v.color,
-          quantity: v.inventory?.[0]?.quantity || 0,
-        })),
-        images: p.images || [],
-      }));
+      products = dbProducts.map((p: any) => {
+        const firstColor = p.colors?.find((c: any) => c.status === "active") || p.colors?.[0] || { color_name: "Default", thumbnail: "", sizes: [], images: [] };
+        return {
+          id: p.id,
+          name: p.name,
+          slug: p.slug,
+          price: Number(p.mrp),
+          sale_price: p.selling_price ? Number(p.selling_price) : null,
+          material: p.fabric,
+          is_trending: p.is_trending,
+          is_featured: p.is_featured,
+          category: p.category ? {
+            name: p.category,
+            slug: p.category.toLowerCase().replace(/\s+/g, "-"),
+          } : null,
+          variants: (firstColor.sizes || []).map((s: any) => ({
+            id: s.id,
+            size: s.size,
+            color: firstColor.color_name,
+            quantity: s.stock || 0,
+          })),
+          images: (firstColor.images || []).map((img: any) => ({
+            url: img.image,
+            alt_text: "",
+          })).concat(
+            firstColor.thumbnail ? [{ url: firstColor.thumbnail, alt_text: "" }] : []
+          ),
+        };
+      });
     } else {
-      products = MOCK_PRODUCTS;
+      products = [];
     }
   } catch (error) {
     console.error("Error fetching shop data:", error);
-    products = MOCK_PRODUCTS;
+    products = [];
     categories = [
       { name: "Kurtis", slug: "kurtis" },
       { name: "Kurta Sets", slug: "kurta-sets" },
@@ -249,10 +269,10 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
     }
   }
 
-  const sizes = ["XS", "S", "M", "L", "XL", "XXL"];
+  const sizes = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "FS"];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    <div className="w-full px-4 sm:px-6 py-10 space-y-8">
       {/* Breadcrumbs */}
       <nav className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
         <Link href="/" className="hover:text-primary transition">Home</Link>
@@ -333,7 +353,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
             <h4 className="text-xs font-bold uppercase tracking-widest text-foreground">Price Filter</h4>
             <div className="space-y-2 text-xs">
               <div className="flex justify-between font-semibold">
-                <span>Max: {price ? `₹${price}` : "Any"}</span>
+                <span>Max: {price ? `â‚¹${price}` : "Any"}</span>
               </div>
               <div className="flex flex-col gap-2">
                 {[2000, 3000, 5000, 7500, 10000].map((pVal) => (
@@ -346,7 +366,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
                       price === pVal.toString() ? "text-primary font-semibold" : "text-muted-foreground"
                     }`}
                   >
-                    <span>Under ₹{pVal}</span>
+                    <span>Under â‚¹{pVal}</span>
                   </Link>
                 ))}
                 {price && (
@@ -403,19 +423,31 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
 
           {/* Products Grid */}
           {products.length === 0 ? (
-            <div className="py-24 border border-dashed border-border flex flex-col items-center justify-center text-center space-y-3 bg-card">
-              <SlidersHorizontal size={36} className="text-muted-foreground" />
-              <div>
-                <h3 className="font-serif text-lg font-medium">No products match your filters</h3>
-                <p className="text-muted-foreground text-xs mt-1">Try clearing some filters or searching for other keywords.</p>
+            !(category || search || size || price) ? (
+              <div className="py-24 border border-dashed border-border/80 flex flex-col items-center justify-center text-center space-y-4 bg-card px-6">
+                <Sparkles size={36} className="text-primary/70 animate-pulse" />
+                <div className="space-y-1">
+                  <h3 className="font-serif text-lg font-medium tracking-wide">The Atelier is Updating the Catalog</h3>
+                  <p className="text-muted-foreground text-xs max-w-md leading-relaxed">
+                    Our luxury handcrafted ethnic ensembles are currently being cataloged. Please check back soon to explore the new arrivals.
+                  </p>
+                </div>
               </div>
-              <Link
-                href="/shop"
-                className="px-6 py-2 bg-primary text-primary-foreground font-semibold text-xs tracking-widest uppercase hover:opacity-90 transition"
-              >
-                Clear Filters
-              </Link>
-            </div>
+            ) : (
+              <div className="py-24 border border-dashed border-border flex flex-col items-center justify-center text-center space-y-3 bg-card">
+                <SlidersHorizontal size={36} className="text-muted-foreground" />
+                <div>
+                  <h3 className="font-serif text-lg font-medium">No products match your filters</h3>
+                  <p className="text-muted-foreground text-xs mt-1">Try clearing some filters or searching for other keywords.</p>
+                </div>
+                <Link
+                  href="/shop"
+                  className="px-6 py-2 bg-primary text-primary-foreground font-semibold text-xs tracking-widest uppercase hover:opacity-90 transition"
+                >
+                  Clear Filters
+                </Link>
+              </div>
+            )
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-10 sm:gap-x-6">
               {products.map((product) => (
@@ -428,3 +460,4 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
     </div>
   );
 }
+

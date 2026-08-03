@@ -45,19 +45,19 @@ export async function createOrder(data: z.infer<typeof checkoutSchema>) {
     // 1. Verify inventory stock for all variants
     for (const item of orderData.items) {
       const { data: inv, error: invErr } = await supabase
-        .from("inventory")
-        .select("quantity")
-        .eq("variant_id", item.variantId)
+        .from("product_sizes")
+        .select("stock")
+        .eq("id", item.variantId)
         .single();
-
+ 
       if (invErr || !inv) {
         return { success: false, error: "Product variant not found in inventory." };
       }
-
-      if (inv.quantity < item.quantity) {
+ 
+      if (inv.stock < item.quantity) {
         return {
           success: false,
-          error: `Insufficient stock for selected items. Only ${inv.quantity} units available.`,
+          error: `Insufficient stock for selected items. Only ${inv.stock} units available.`,
         };
       }
     }
@@ -120,16 +120,16 @@ export async function createOrder(data: z.infer<typeof checkoutSchema>) {
     // 4. Update inventories
     for (const item of orderData.items) {
       const { data: currentInv } = await supabase
-        .from("inventory")
-        .select("quantity")
-        .eq("variant_id", item.variantId)
+        .from("product_sizes")
+        .select("stock")
+        .eq("id", item.variantId)
         .single();
         
       if (currentInv) {
         await supabase
-          .from("inventory")
-          .update({ quantity: currentInv.quantity - item.quantity })
-          .eq("variant_id", item.variantId);
+          .from("product_sizes")
+          .update({ stock: currentInv.stock - item.quantity })
+          .eq("id", item.variantId);
       }
     }
 

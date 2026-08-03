@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { createClient } from "@/lib/supabase/client";
+import { useCart } from "@/features/cart/useCart";
 
 export interface UserProfile {
   id: string;
@@ -71,6 +72,9 @@ export const useAuth = create<AuthState>((set, get) => ({
     if (session?.user) {
       set({ user: session.user });
 
+      // Merge cart with DB on restore
+      useCart.getState().mergeCartWithDatabase();
+
       // Fetch or self-heal profile
       const profile = await fetchOrCreateProfile(supabase, session.user);
 
@@ -91,7 +95,14 @@ export const useAuth = create<AuthState>((set, get) => ({
     // Listen for auth state changes
     supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
+        const currentUser = get().user;
         set({ user: session.user });
+
+        // Merge cart with DB if user just logged in or user changed
+        if (!currentUser || currentUser.id !== session.user.id) {
+          useCart.getState().mergeCartWithDatabase();
+        }
+
         const profile = await fetchOrCreateProfile(supabase, session.user);
 
         if (profile) {
