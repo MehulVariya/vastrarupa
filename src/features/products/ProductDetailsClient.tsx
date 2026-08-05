@@ -44,6 +44,7 @@ export interface ProductDetails {
   fabric: string | null;
   fit: string | null;
   colors: ProductColor[];
+  keywords?: string[] | null;
 }
 
 interface ProductDetailsClientProps {
@@ -497,6 +498,21 @@ export default function ProductDetailsClient({ product, initialReviews }: Produc
                 <li>Includes signature Vastrarupa gold-foil box packaging</li>
               </ul>
             </div>
+            {product.keywords && product.keywords.length > 0 && (
+              <div className="space-y-2 pt-1">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-foreground">Tags</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {product.keywords.map((kw, i) => (
+                    <span
+                      key={i}
+                      className="text-[10px] bg-muted/60 text-muted-foreground border border-border/60 px-2.5 py-0.5 rounded-sm font-medium tracking-wide"
+                    >
+                      {kw}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

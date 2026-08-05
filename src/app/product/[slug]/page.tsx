@@ -141,7 +141,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     const { data: dbProduct } = await supabase
       .from("products")
       .select(`
-        id, category_id, name, slug, description, brand, category, mrp, selling_price, fabric, fit, status, is_featured, is_trending,
+        id, category_id, name, slug, description, brand, category, mrp, selling_price, fabric, fit, status, is_featured, is_trending, keywords, seo_details,
         colors:product_colors (
           id, 
           color_name, 
@@ -180,6 +180,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         selling_price: Number(dbProduct.selling_price),
         fabric: dbProduct.fabric,
         fit: dbProduct.fit,
+        keywords: dbProduct.keywords || dbProduct.seo_details?.keywords || [],
         colors: (dbProduct.colors || [])
           .filter((c: any) => c.status === "active")
           .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))

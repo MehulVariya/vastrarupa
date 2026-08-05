@@ -190,9 +190,17 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
       query = query.ilike("category", `%${category}%`);
     }
 
+    // Check if keywords column exists in database schema
+    const { data: probeList } = await supabase.from("products").select("*").limit(1);
+    const hasKeywordsCol = probeList && probeList.length > 0 && "keywords" in probeList[0];
+
     // Apply search filter
     if (search) {
-      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+      if (hasKeywordsCol) {
+        query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%,keywords.cs.{"${search}"}`);
+      } else {
+        query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+      }
     }
 
     // Apply sorting (on selling_price instead of price)

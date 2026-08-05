@@ -53,6 +53,10 @@ function ProductFormContent() {
   const [canonicalUrl, setCanonicalUrl] = useState("");
   const [robotsSetting, setRobotsSetting] = useState("index, follow");
 
+  // ── Keywords/Tags State ──
+  const [prodKeywords, setProdKeywords] = useState<string[]>([]);
+  const [keywordInput, setKeywordInput] = useState("");
+
   const nameTouched = useRef(false);
   const descTouched = useRef(false);
   const slugTouched = useRef(false);
@@ -258,6 +262,9 @@ function ProductFormContent() {
             setFocusKeyword(seo.focus_keyword || "");
             setCanonicalUrl(seo.canonical_url || "");
             setRobotsSetting(seo.robots || "index, follow");
+
+            // Load keywords
+            setProdKeywords(p.keywords || seo.keywords || []);
 
             nameTouched.current = !!seo.title;
             descTouched.current = !!seo.meta_description;
@@ -469,13 +476,15 @@ function ProductFormContent() {
       const { data: probeList } = await supabase.from("products").select("*").limit(1);
       let useNewSchema = true;
       let hasCategoryCol = false;
+      let hasKeywordsCol = false;
       
       if (probeList && probeList.length > 0) {
         useNewSchema = "mrp" in probeList[0];
         hasCategoryCol = "category" in probeList[0];
+        hasKeywordsCol = "keywords" in probeList[0];
       }
 
-      const buildPayload = (newSchema: boolean, includeCategory: boolean) => {
+      const buildPayload = (newSchema: boolean, includeCategory: boolean, includeKeywords: boolean) => {
         const fabricDetails = {
           lehenga: {
             fabric: lehenkaFabric || undefined,
@@ -499,7 +508,7 @@ function ProductFormContent() {
           occasions: occasions || undefined,
         };
 
-        const seoDetails = {
+        const seoDetails: any = {
           title: seoTitle || undefined,
           meta_description: metaDescription || undefined,
           focus_keyword: focusKeyword || undefined,
@@ -532,6 +541,12 @@ function ProductFormContent() {
           seo_details: seoDetails,
           slug: cleanSlug,
         };
+
+        if (includeKeywords) {
+          p.keywords = prodKeywords;
+        } else {
+          seoDetails.keywords = prodKeywords;
+        }
 
         if (newSchema) {
           p.mrp = parsedMRP;
@@ -570,7 +585,7 @@ function ProductFormContent() {
       };
 
       // Try first attempt with detected/assumed schema
-      let payload = buildPayload(useNewSchema, hasCategoryCol);
+      let payload = buildPayload(useNewSchema, hasCategoryCol, hasKeywordsCol);
       let result = await executeSave(payload);
 
       // Fallback 1: If database schema is legacy (price/sale_price/material/care_instructions) but we assumed new schema
@@ -582,7 +597,7 @@ function ProductFormContent() {
       )) {
         console.warn("Attempting fallback to legacy schema columns (price, sale_price, material, care_instructions).");
         useNewSchema = false;
-        payload = buildPayload(useNewSchema, hasCategoryCol);
+        payload = buildPayload(useNewSchema, hasCategoryCol, hasKeywordsCol);
         result = await executeSave(payload);
       }
 
@@ -590,7 +605,7 @@ function ProductFormContent() {
       if (result.error && result.error.message.includes("category")) {
         console.warn("Attempting fallback without 'category' column.");
         hasCategoryCol = false;
-        payload = buildPayload(useNewSchema, hasCategoryCol);
+        payload = buildPayload(useNewSchema, hasCategoryCol, hasKeywordsCol);
         result = await executeSave(payload);
       }
 
@@ -819,6 +834,75 @@ function ProductFormContent() {
                 onChange={(e) => setProdCare(e.target.value)}
                 className="w-full bg-background border border-border px-3 py-2 focus:outline-none focus:border-primary text-xs"
               />
+            </div>
+
+            {/* Keywords / Tags (Multiple optional tags) */}
+            <div className="space-y-2 pt-2 border-t border-border mt-4">
+              <label className="font-bold text-muted-foreground uppercase tracking-wider block text-xs">Keywords / Tags (Optional)</label>
+              
+              <div className="flex flex-wrap gap-2 mb-2">
+                {prodKeywords.map((kw, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1.5 text-xs bg-primary/10 text-primary border border-primary/20 rounded-full px-3 py-1 font-medium tracking-wide transition-all duration-200 hover:bg-primary/15"
+                  >
+                    {kw}
+                    <button
+                      type="button"
+                      onClick={() => setProdKeywords(prodKeywords.filter((_, idx) => idx !== i))}
+                      className="hover:text-destructive focus:outline-none transition-colors duration-150 cursor-pointer font-bold text-sm"
+                      title="Remove keyword"
+                    >
+                      &times;
+                    </button>
+                  </span>
+                ))}
+                {prodKeywords.length === 0 && (
+                  <span className="text-xs text-muted-foreground italic">No keywords added yet.</span>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={keywordInput}
+                  onChange={(e) => setKeywordInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === ",") {
+                      e.preventDefault();
+                      const val = keywordInput.trim().replace(/,$/, "");
+                      if (val && !prodKeywords.includes(val)) {
+                        setProdKeywords([...prodKeywords, val]);
+                        setKeywordInput("");
+                      }
+                    }
+                  }}
+                  placeholder="Type a keyword and press Enter or comma..."
+                  className="flex-1 bg-background border border-border px-3 py-2 focus:outline-none focus:border-primary text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const val = keywordInput.trim();
+                    if (val && !prodKeywords.includes(val)) {
+                      setProdKeywords([...prodKeywords, val]);
+                      setKeywordInput("");
+                    }
+                  }}
+                  className="bg-primary text-primary-foreground px-4 py-2 hover:bg-primary/95 text-xs font-semibold transition-colors duration-150 cursor-pointer"
+                >
+                  Add
+                </button>
+                {prodKeywords.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setProdKeywords([])}
+                    className="border border-border text-muted-foreground px-3 py-2 hover:bg-accent text-xs transition-colors duration-150 cursor-pointer"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
